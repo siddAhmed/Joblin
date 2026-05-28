@@ -6,12 +6,24 @@ from backend.llm.prompts import build_filter_prompt, build_summarize_prompt
 
 
 class GeminiAdapter:
-    FILTER_MODEL = "gemini-2.0-flash-lite"
-    SUMMARIZE_MODEL = "gemini-2.0-flash-lite"
-
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, filter_model: str = "gemini-2.0-flash-lite", summarize_model: str = "gemini-2.0-flash-lite"):
         self._client = genai.Client(api_key=api_key)
+        self._filter_model = filter_model
+        self._summarize_model = summarize_model
         self.last_usage: dict = {}
+
+    def _record_usage(self, response) -> None:
+        meta = getattr(response, "usage_metadata", None)
+        if meta:
+            prompt = getattr(meta, "prompt_token_count", 0) or 0
+            completion = getattr(meta, "candidates_token_count", 0) or 0
+            self.last_usage = {
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": getattr(meta, "total_token_count", 0) or (prompt + completion),
+            }
+        else:
+            self.last_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     async def filter(
         self,
@@ -25,15 +37,10 @@ class GeminiAdapter:
         system, user = build_filter_prompt(title, company_name, location, description, criteria, negative_examples)
         prompt = f"{system}\n\n{user}"
         response = await self._client.aio.models.generate_content(
-            model=self.FILTER_MODEL,
+            model=self._filter_model,
             contents=prompt,
         )
-        if response.usage_metadata:
-            self.last_usage = {
-                "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
-                "completion_tokens": response.usage_metadata.candidates_token_count or 0,
-                "total_tokens": response.usage_metadata.total_token_count or 0,
-            }
+        self._record_usage(response)
         raw = response.text or ""
         try:
             start = raw.find("{")
@@ -52,13 +59,8 @@ class GeminiAdapter:
     ) -> str:
         prompt = build_summarize_prompt(title, company_name, description, score)
         response = await self._client.aio.models.generate_content(
-            model=self.SUMMARIZE_MODEL,
+            model=self._summarize_model,
             contents=prompt,
         )
-        if response.usage_metadata:
-            self.last_usage = {
-                "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
-                "completion_tokens": response.usage_metadata.candidates_token_count or 0,
-                "total_tokens": response.usage_metadata.total_token_count or 0,
-            }
+        self._record_usage(response)
         return response.text or ""

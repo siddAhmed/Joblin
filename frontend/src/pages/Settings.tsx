@@ -114,15 +114,119 @@ export function Settings() {
       )}
 
       {tab === "llm" && (
-        <div className="space-y-3 max-w-md">
-          {[{ key: "groq_api_key", label: "Groq API Key" }, { key: "cerebras_api_key", label: "Cerebras API Key" }, { key: "gemini_api_key", label: "Gemini API Key" }].map(({ key, label }) => (
-            <div key={key}>
-              <label className="block text-xs text-[#888] mb-1">{label}</label>
-              <input type="password" defaultValue={(s[key] as string) || ""}
-                onBlur={(e) => update.mutate({ [key]: e.target.value })}
+        <div className="space-y-6 max-w-lg">
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#888] uppercase tracking-wider">Providers</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Filter provider</label>
+                <select value={(s.llm_filter_provider as string) || "groq"}
+                  onChange={(e) => update.mutate({ llm_filter_provider: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="groq">Groq</option>
+                  <option value="cerebras">Cerebras</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Summarize provider</label>
+                <select value={(s.llm_summarize_provider as string) || "cerebras"}
+                  onChange={(e) => update.mutate({ llm_summarize_provider: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="groq">Groq</option>
+                  <option value="cerebras">Cerebras</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#888] uppercase tracking-wider">Groq</h3>
+            <div>
+              <label className="block text-xs text-[#888] mb-1">API Key</label>
+              <input type="password" defaultValue={(s.groq_api_key as string) || ""}
+                onBlur={(e) => update.mutate({ groq_api_key: e.target.value })}
                 className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5]" />
             </div>
-          ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Filter model</label>
+                <select value={(s.groq_filter_model as string) || "llama-3.1-8b-instant"}
+                  onChange={(e) => update.mutate({ groq_filter_model: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+                  <option value="llama-3.2-11b-text-preview">llama-3.2-11b-text-preview</option>
+                  <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Summarize model</label>
+                <select value={(s.groq_summarize_model as string) || "llama-3.1-8b-instant"}
+                  onChange={(e) => update.mutate({ groq_summarize_model: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+                  <option value="llama-3.2-11b-text-preview">llama-3.2-11b-text-preview</option>
+                  <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#888] uppercase tracking-wider">Cerebras</h3>
+            <div>
+              <label className="block text-xs text-[#888] mb-1">API Key</label>
+              <input type="password" defaultValue={(s.cerebras_api_key as string) || ""}
+                onBlur={(e) => update.mutate({ cerebras_api_key: e.target.value })}
+                className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5]" />
+            </div>
+            <div>
+              <label className="block text-xs text-[#888] mb-1">Model</label>
+              <select value={(s.cerebras_model as string) || "gpt-oss-120b"}
+                onChange={(e) => update.mutate({ cerebras_model: e.target.value })}
+                className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                <option value="gpt-oss-120b">gpt-oss-120b</option>
+                <option value="zai-glm-4.7">zai-glm-4.7</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#888] uppercase tracking-wider">Gemini</h3>
+            <div>
+              <label className="block text-xs text-[#888] mb-1">API Key</label>
+              <input type="password" defaultValue={(s.gemini_api_key as string) || ""}
+                onBlur={(e) => update.mutate({ gemini_api_key: e.target.value })}
+                className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5]" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Filter model</label>
+                <select value={(s.gemini_filter_model as string) || "gemini-2.0-flash-lite"}
+                  onChange={(e) => update.mutate({ gemini_filter_model: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-[#888] mb-1">Summarize model</label>
+                <select value={(s.gemini_summarize_model as string) || "gemini-2.0-flash-lite"}
+                  onChange={(e) => update.mutate({ gemini_summarize_model: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -6,11 +6,21 @@ from backend.llm.prompts import build_filter_prompt, build_summarize_prompt
 
 
 class GroqAdapter:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, filter_model: str = "llama-3.1-8b-instant", summarize_model: str = "llama-3.1-8b-instant"):
         self._client = AsyncGroq(api_key=api_key)
-        self._filter_model = "llama-3.1-8b-instant"
-        self._summarize_model = "llama-3.1-8b-instant"
+        self._filter_model = filter_model
+        self._summarize_model = summarize_model
         self.last_usage: dict = {}
+
+    def _record_usage(self, usage) -> None:
+        if usage:
+            self.last_usage = {
+                "prompt_tokens": usage.prompt_tokens or 0,
+                "completion_tokens": usage.completion_tokens or 0,
+                "total_tokens": usage.total_tokens or 0,
+            }
+        else:
+            self.last_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     async def filter(
         self,
@@ -28,12 +38,7 @@ class GroqAdapter:
             temperature=0.0,
             max_tokens=128,
         )
-        if response.usage:
-            self.last_usage = {
-                "prompt_tokens": response.usage.prompt_tokens or 0,
-                "completion_tokens": response.usage.completion_tokens or 0,
-                "total_tokens": response.usage.total_tokens or 0,
-            }
+        self._record_usage(response.usage)
         raw = response.choices[0].message.content or ""
         try:
             parsed = json.loads(raw)
@@ -55,10 +60,5 @@ class GroqAdapter:
             temperature=0.3,
             max_tokens=300,
         )
-        if response.usage:
-            self.last_usage = {
-                "prompt_tokens": response.usage.prompt_tokens or 0,
-                "completion_tokens": response.usage.completion_tokens or 0,
-                "total_tokens": response.usage.total_tokens or 0,
-            }
+        self._record_usage(response.usage)
         return response.choices[0].message.content or ""
