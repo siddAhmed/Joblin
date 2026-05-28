@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
 import { jobsApi } from "@/api/jobs";
-import { formatScore, formatDate } from "@/lib/utils";
+import { formatScore } from "@/lib/utils";
 
 function MatchRow({ match, selected, onSelect }: { match: Match; selected: boolean; onSelect: () => void }) {
   const [expanded, setExpanded] = useState(false);
