@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/joblin.db
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  db_data:
