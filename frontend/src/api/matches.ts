@@ -10,6 +10,10 @@ export interface Match {
   notified_at: string | null;
   not_interested_at: string | null;
   created_at: string;
+  job_title: string;
+  company_name: string;
+  location: string | null;
+  job_url: string;
 }
 
 export const matchesApi = {

@@ -9,6 +9,7 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
   const [expanded, setExpanded] = useState(false);
   const { data: job } = useQuery({ queryKey: ["job", match.job_id], queryFn: () => jobsApi.get(match.job_id), enabled: expanded });
   const qc = useQueryClient();
+  const applyUrl = match.job_url || job?.url;
   const dismiss = useMutation({ mutationFn: () => jobsApi.dismiss(match.job_id), onSuccess: () => qc.invalidateQueries({ queryKey: ["matches"] }) });
 
   const isStrong = match.tier === "strong";
@@ -18,8 +19,13 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
         <input type="checkbox" checked={selected} onChange={onSelect} onClick={(e) => e.stopPropagation()} />
         <span className={`w-2 h-2 rounded-full shrink-0 ${isStrong ? "bg-emerald-500" : "bg-yellow-500"}`} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm text-[#e5e5e5] truncate">Job #{match.job_id}</div>
-          <div className="text-[11px] text-[#666]">{formatDate(match.created_at)}</div>
+          <div className="text-sm text-[#e5e5e5] truncate">{match.job_title}</div>
+          <div className="text-[11px] text-[#888] truncate">
+            {match.company_name}{match.location ? ` · ${match.location}` : ""}
+          </div>
+          {match.summary && (
+            <div className="text-[11px] text-[#555] truncate mt-0.5">{match.summary}</div>
+          )}
         </div>
         <span className="font-mono text-xs text-[#888]">{formatScore(match.score)}</span>
         {match.is_preview && <span className="bg-purple-900/40 text-purple-400 text-[10px] px-1.5 rounded">preview</span>}
@@ -35,7 +41,7 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
           )}
           <div className="flex gap-2 mt-3">
             <button onClick={() => dismiss.mutate()} className="text-[11px] border border-[#2a2a2a] rounded px-2 py-1 text-[#888] hover:text-[#ccc]">Not interested</button>
-            {job?.url && <a href={job.url} target="_blank" rel="noreferrer" className="text-[11px] border border-[#4e9eff] rounded px-2 py-1 text-[#4e9eff] hover:bg-[#0e2040]">Apply</a>}
+            {applyUrl && <a href={applyUrl} target="_blank" rel="noreferrer" className="text-[11px] border border-[#4e9eff] rounded px-2 py-1 text-[#4e9eff] hover:bg-[#0e2040]">Apply</a>}
           </div>
         </div>
       )}

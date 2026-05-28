@@ -25,19 +25,28 @@ async def list_matches(
     limit: int = Query(50, le=200),
     offset: int = Query(0),
 ):
-    stmt = select(Match).order_by(Match.created_at.desc())
+    stmt = (
+        select(Match, Job, Company)
+        .join(Job, Match.job_id == Job.id)
+        .join(Company, Job.company_id == Company.id)
+        .order_by(Match.created_at.desc())
+    )
     if tier:
         stmt = stmt.where(Match.tier == tier)
     stmt = stmt.offset(offset).limit(limit)
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = (await session.execute(stmt)).all()
     return [
         {
             "id": m.id, "job_id": m.job_id, "score": m.score, "tier": m.tier,
             "summary": m.summary, "is_preview": m.is_preview,
             "notified_at": m.notified_at, "not_interested_at": m.not_interested_at,
             "created_at": m.created_at,
+            "job_title": j.title,
+            "company_name": c.name,
+            "location": j.location,
+            "job_url": j.url,
         }
-        for m in rows
+        for m, j, c in rows
     ]
 
 
