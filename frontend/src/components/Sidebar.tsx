@@ -24,7 +24,13 @@ export function Sidebar({ quarantineCount = 0 }: { quarantineCount?: number }) {
   if (collapsed) {
     return (
       <aside className="flex flex-col items-center w-11 bg-[#111] border-r border-[#1e1e1e] shrink-0 py-3">
-        <div className="font-black text-[#4e9eff] text-sm pb-3 border-b border-[#1e1e1e] w-full text-center mb-2">J</div>
+        <div className="flex flex-col items-center pb-3 border-b border-[#1e1e1e] w-full mb-2 gap-1.5">
+          <div className="font-black text-[#4e9eff] text-sm">J</div>
+          <button onClick={() => setCollapsed(false)} title="Expand sidebar"
+            className="text-[#555] hover:text-[#888] text-xs border border-[#2a2a2a] rounded w-7 h-5 flex items-center justify-center">
+            &rsaquo;
+          </button>
+        </div>
         {NAV.map((item) => (
           <NavLink key={item.path} to={item.path} end={item.path === "/"}
             title={item.label}
@@ -39,10 +45,6 @@ export function Sidebar({ quarantineCount = 0 }: { quarantineCount?: number }) {
             )}
           </NavLink>
         ))}
-        <button onClick={() => setCollapsed(false)}
-          className="mt-auto text-[#555] hover:text-[#888] text-xs border border-[#2a2a2a] rounded w-7 h-6 flex items-center justify-center">
-          &rsaquo;
-        </button>
       </aside>
     );
   }
