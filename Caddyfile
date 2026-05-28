@@ -1,5 +1,5 @@
-{$PUBLIC_HOSTNAME} {
-    basicauth /* {
+http://{$PUBLIC_HOSTNAME} {
+    basic_auth /* {
         joblin {$CADDY_HASHED_PASSWORD}
     }
     reverse_proxy app:8000
