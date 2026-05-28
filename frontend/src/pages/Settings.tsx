@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsApi } from "@/api/settings";
+import { api } from "@/api/client";
 
-type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets";
+type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets" | "danger";
 
 export function Settings() {
   const [tab, setTab] = useState<Tab>("discord");
   const [testJd, setTestJd] = useState("");
   const [testResult, setTestResult] = useState<{ score?: number; reasoning?: string; error?: string } | null>(null);
+  const [resetInput, setResetInput] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const qc = useQueryClient();
   const { data: settings = {} as Record<string, unknown> } = useQuery({ queryKey: ["settings"], queryFn: settingsApi.get });
   const { data: presets = [] } = useQuery({ queryKey: ["presets"], queryFn: settingsApi.listPresets });
@@ -15,12 +20,30 @@ export function Settings() {
   const applyPreset = useMutation({ mutationFn: (name: string) => settingsApi.applyPreset(name), onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }) });
   const testDiscord = useMutation({ mutationFn: settingsApi.testDiscord });
 
+  async function handleReset() {
+    setResetError(null);
+    try {
+      await api.post("/admin/reset");
+      setResetDone(true);
+      setResetInput("");
+      setShowResetConfirm(false);
+      qc.invalidateQueries({ queryKey: ["runs"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["matches"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Reset failed";
+      setResetError(msg);
+    }
+  }
+
   const tabs: { key: Tab; label: string }[] = [
     { key: "discord", label: "Discord" },
     { key: "criteria", label: "Criteria" },
     { key: "schedule", label: "Schedule" },
     { key: "llm", label: "LLM Keys" },
     { key: "presets", label: "Presets" },
+    { key: "danger", label: "Danger" },
   ];
 
   const s = settings as Record<string, unknown>;
@@ -245,6 +268,62 @@ export function Settings() {
               <button onClick={() => applyPreset.mutate(p.name)} className="text-xs border border-[#4e9eff] rounded px-3 py-1.5 text-[#4e9eff] bg-[#0e2040]">Apply</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "danger" && (
+        <div className="max-w-md space-y-4">
+          <div className="border border-red-900 rounded-lg p-4 bg-[#0a0a0a]">
+            <h3 className="text-sm font-semibold text-red-400 mb-2">Reset job data</h3>
+            <div className="text-xs text-[#666] space-y-1 mb-4">
+              <p>Permanently deletes:</p>
+              <ul className="list-disc list-inside text-[#555] space-y-0.5">
+                <li>All scraped jobs</li>
+                <li>All matches and summaries</li>
+                <li>All run history</li>
+                <li>Feedback / not-interested signals</li>
+              </ul>
+              <p className="mt-2">Keeps: companies, settings, API keys, token usage history.</p>
+            </div>
+
+            {resetDone && (
+              <div className="text-xs text-emerald-500 mb-3">Reset complete. Database is empty.</div>
+            )}
+
+            {!showResetConfirm ? (
+              <button
+                onClick={() => { setShowResetConfirm(true); setResetDone(false); }}
+                className="text-xs border border-red-800 rounded px-3 py-1.5 text-red-400 hover:bg-red-950 transition-colors"
+              >
+                Reset job data
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  value={resetInput}
+                  onChange={(e) => setResetInput(e.target.value)}
+                  placeholder="Type RESET to confirm"
+                  className="w-full bg-[#111] border border-red-900 rounded px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#444]"
+                />
+                {resetError && <div className="text-xs text-red-400">{resetError}</div>}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleReset}
+                    disabled={resetInput !== "RESET"}
+                    className="text-xs border border-red-700 rounded px-3 py-1.5 text-red-400 bg-red-950 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-900 transition-colors"
+                  >
+                    Confirm reset
+                  </button>
+                  <button
+                    onClick={() => { setShowResetConfirm(false); setResetInput(""); setResetError(null); }}
+                    className="text-xs text-[#555] hover:text-[#888]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
