@@ -1,0 +1,12 @@
+{
+  "description": "Python ML engineer: ML platform, MLOps, data science",
+  "criteria": {
+    "title_allowlist": "machine learning|ml engineer|ml platform|mlops|data scientist|ai engineer|research engineer",
+    "title_denylist": "intern|contract|front.?end|mobile",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["senior", "staff", "principal", "lead", "mid"],
+    "exclusion_keywords": ["clearance required"],
+    "profile_description": "ML engineer with Python expertise seeking roles in ML platform engineering, MLOps, or applied ML at product companies."
+  }
+}

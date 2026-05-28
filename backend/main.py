@@ -14,10 +14,17 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from apscheduler import AsyncScheduler
     from backend.config import seed_defaults
+    from backend.scheduler import start_scheduler
+
     async with AsyncSessionLocal() as session:
         await seed_defaults(session)
-    yield
+
+    async with AsyncScheduler() as scheduler:
+        await start_scheduler(scheduler)
+        await scheduler.start_in_background()
+        yield
 
 
 def create_app() -> FastAPI:

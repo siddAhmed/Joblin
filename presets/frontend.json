@@ -1,0 +1,12 @@
+{
+  "description": "Frontend engineer: React, TypeScript, product UI",
+  "criteria": {
+    "title_allowlist": "front.?end|ui engineer|react|web engineer|javascript|typescript",
+    "title_denylist": "intern|contract|backend|mobile",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["senior", "staff", "principal", "lead"],
+    "exclusion_keywords": ["clearance required"],
+    "profile_description": "Senior frontend engineer specializing in React, TypeScript, and design systems at product-focused companies."
+  }
+}

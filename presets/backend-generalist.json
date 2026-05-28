@@ -1,0 +1,12 @@
+{
+  "description": "Backend generalist: Python, distributed systems, infrastructure",
+  "criteria": {
+    "title_allowlist": "backend|platform|infrastructure|systems|distributed|data engineer|api",
+    "title_denylist": "intern|contract|marketing|sales|design|front.?end",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["senior", "staff", "principal", "lead"],
+    "exclusion_keywords": ["clearance required", "on-site only"],
+    "profile_description": "Experienced backend engineer skilled in Python, distributed systems, and API design. Seeking senior or staff-level roles at product companies."
+  }
+}
