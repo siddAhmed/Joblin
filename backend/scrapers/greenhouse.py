@@ -1,11 +1,6 @@
-import re
 import httpx
 
-from backend.scrapers.base import ScrapedJob
-
-
-def _strip_html(html: str) -> str:
-    return re.sub(r"<[^>]+>", " ", html).strip()
+from backend.scrapers.base import ScrapedJob, clean_description
 
 
 async def fetch_greenhouse_jobs(identifier: str) -> list[ScrapedJob]:
@@ -23,7 +18,7 @@ async def fetch_greenhouse_jobs(identifier: str) -> list[ScrapedJob]:
                 title=raw.get("title", ""),
                 location=raw.get("location", {}).get("name"),
                 url=raw.get("absolute_url", ""),
-                raw_description=_strip_html(raw.get("content", "")),
+                raw_description=clean_description(raw.get("content", "")),
             )
         )
     return jobs

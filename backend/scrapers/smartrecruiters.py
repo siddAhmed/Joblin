@@ -1,5 +1,5 @@
 import httpx
-from backend.scrapers.base import ScrapedJob
+from backend.scrapers.base import ScrapedJob, clean_description
 
 
 async def fetch_smartrecruiters_jobs(identifier: str) -> list[ScrapedJob]:
@@ -19,7 +19,7 @@ async def fetch_smartrecruiters_jobs(identifier: str) -> list[ScrapedJob]:
                 title=raw.get("name", ""),
                 location=location,
                 url=f"https://jobs.smartrecruiters.com/{identifier}/{raw.get('id')}",
-                raw_description=raw.get("jobAd", {}).get("sections", {}).get("jobDescription", {}).get("text", ""),
+                raw_description=clean_description(raw.get("jobAd", {}).get("sections", {}).get("jobDescription", {}).get("text", "")),
             )
         )
     return jobs

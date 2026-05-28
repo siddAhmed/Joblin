@@ -1,5 +1,5 @@
 import httpx
-from backend.scrapers.base import ScrapedJob
+from backend.scrapers.base import ScrapedJob, clean_description
 
 
 async def fetch_lever_jobs(identifier: str) -> list[ScrapedJob]:
@@ -17,7 +17,7 @@ async def fetch_lever_jobs(identifier: str) -> list[ScrapedJob]:
                 title=raw.get("text", ""),
                 location=raw.get("categories", {}).get("location"),
                 url=raw.get("hostedUrl", ""),
-                raw_description=raw.get("descriptionPlain", ""),
+                raw_description=clean_description(raw.get("descriptionPlain", "")),
             )
         )
     return jobs
