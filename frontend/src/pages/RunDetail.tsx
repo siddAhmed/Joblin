@@ -60,9 +60,14 @@ export function RunDetail() {
           </div>
         ))}
         {done && (
-          <div className={run?.status === "cancelled" ? "text-orange-400" : "text-emerald-500"}>
-            {run?.status === "cancelled" ? "Run cancelled." : "Run complete."}
-          </div>
+          <>
+            <div className={run?.status === "cancelled" ? "text-orange-400" : "text-emerald-500"}>
+              {run?.status === "cancelled" ? "Run cancelled." : "Run complete."}
+            </div>
+            {events.find((e) => e.type === "run_done")?.data?.seeding && (
+              <div className="text-yellow-600 mt-1">Seeding run: jobs stored, Discord notifications skipped.</div>
+            )}
+          </>
         )}
       </div>
     </div>

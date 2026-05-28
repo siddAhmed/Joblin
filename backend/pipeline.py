@@ -107,12 +107,18 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
         for r in fb_rows
     ]
 
+    from sqlalchemy import func as sa_func
+    existing_job_count = (await session.execute(
+        sa_select(sa_func.count()).select_from(Job)
+    )).scalar() or 0
+    is_seeding_run = existing_job_count == 0
+
     stmt = sa_select(Company).where(Company.is_active == True)
     if run.company_ids:
         stmt = stmt.where(Company.id.in_(run.company_ids))
     companies = (await session.execute(stmt)).scalars().all()
 
-    await _emit(run_id, "run_started", {"run_id": run_id, "company_count": len(companies)})
+    await _emit(run_id, "run_started", {"run_id": run_id, "company_count": len(companies), "seeding": is_seeding_run})
 
     total_found = total_heuristic = total_confirmed = total_notified = 0
 
@@ -223,7 +229,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
             await session.flush()
             confirmed_count += 1
 
-            if not is_preview and settings.get("discord_webhook_url"):
+            if not is_preview and not is_seeding_run and settings.get("discord_webhook_url"):
                 try:
                     await post_match_to_discord(
                         webhook_url=settings["discord_webhook_url"],
@@ -271,6 +277,6 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     await session.commit()
 
     await _emit(run_id, "run_done", {
-        "run_id": run_id, "status": "completed", "total_confirmed": total_confirmed
+        "run_id": run_id, "status": "completed", "total_confirmed": total_confirmed, "seeding": is_seeding_run
     })
     _run_queues.pop(run_id, None)
