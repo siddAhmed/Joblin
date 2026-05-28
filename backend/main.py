@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import AsyncSessionLocal
-from backend.routers import system, companies, runs as runs_router
+from backend.routers import system, companies, runs as runs_router, jobs, matches, settings as settings_router, presets
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -25,6 +25,10 @@ def create_app() -> FastAPI:
     app.include_router(system.router, prefix="/api")
     app.include_router(companies.router, prefix="/api")
     app.include_router(runs_router.router, prefix="/api")
+    app.include_router(jobs.router, prefix="/api")
+    app.include_router(matches.router, prefix="/api")
+    app.include_router(settings_router.router, prefix="/api")
+    app.include_router(presets.router, prefix="/api")
     if FRONTEND_DIST.exists():
         app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")
     return app
