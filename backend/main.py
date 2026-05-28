@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import AsyncSessionLocal
-from backend.routers import system
+from backend.routers import system, companies, runs as runs_router
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="Joblin", lifespan=lifespan)
     app.include_router(system.router, prefix="/api")
+    app.include_router(companies.router, prefix="/api")
+    app.include_router(runs_router.router, prefix="/api")
     if FRONTEND_DIST.exists():
         app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")
     return app
