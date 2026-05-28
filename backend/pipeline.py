@@ -80,7 +80,11 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     from backend.llm.protocol import CriteriaConfig, FeedbackExample
     from backend.models.match import Match, MatchTier
     from backend.models.feedback import FeedbackExample as FBModel
+    from backend.models.token_usage import TokenUsage
     from backend.discord import post_match_to_discord
+
+    def _provider_name(provider) -> str:
+        return type(provider).__name__.lower().replace("adapter", "")
 
     run = await session.get(Run, run_id)
     if not run:
@@ -201,6 +205,16 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
             except Exception:
                 filter_result = None
 
+            if hasattr(filter_provider, "last_usage") and filter_provider.last_usage.get("total_tokens", 0) > 0:
+                session.add(TokenUsage(
+                    run_id=run_id,
+                    provider=_provider_name(filter_provider),
+                    call_type="filter",
+                    prompt_tokens=filter_provider.last_usage["prompt_tokens"],
+                    completion_tokens=filter_provider.last_usage["completion_tokens"],
+                    total_tokens=filter_provider.last_usage["total_tokens"],
+                ))
+
             if not filter_result or filter_result.score < 0.4:
                 continue
 
@@ -215,6 +229,16 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
                 )
             except Exception:
                 summary = ""
+
+            if hasattr(summarize_provider, "last_usage") and summarize_provider.last_usage.get("total_tokens", 0) > 0:
+                session.add(TokenUsage(
+                    run_id=run_id,
+                    provider=_provider_name(summarize_provider),
+                    call_type="summarize",
+                    prompt_tokens=summarize_provider.last_usage["prompt_tokens"],
+                    completion_tokens=summarize_provider.last_usage["completion_tokens"],
+                    total_tokens=summarize_provider.last_usage["total_tokens"],
+                ))
 
             match = Match(
                 job_id=job.id,
