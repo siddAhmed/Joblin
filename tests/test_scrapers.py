@@ -85,8 +85,10 @@ async def test_greenhouse_returns_scraped_jobs():
             }
         ]
     }
-    mock_response = AsyncMock()
+    from unittest.mock import MagicMock
+    mock_response = MagicMock()
     mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = mock_data
 
     with patch("backend.scrapers.greenhouse.httpx.AsyncClient") as MockClient:
