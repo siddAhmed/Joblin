@@ -8,6 +8,7 @@ const NAV = [
   { label: "All Jobs", icon: "≡", path: "/jobs" },
   { label: "Companies", icon: "⊞", path: "/companies", warn: true },
   { label: "Runs", icon: "▶", path: "/runs" },
+  { label: "Usage", icon: "◈", path: "/usage" },
   { label: "Settings", icon: "⚙", path: "/settings" },
 ] as const;
 
