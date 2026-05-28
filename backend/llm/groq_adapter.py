@@ -10,6 +10,7 @@ class GroqAdapter:
         self._client = AsyncGroq(api_key=api_key)
         self._filter_model = "llama-3.1-8b-instant"
         self._summarize_model = "llama-3.1-8b-instant"
+        self.last_usage: dict = {}
 
     async def filter(
         self,
@@ -27,6 +28,12 @@ class GroqAdapter:
             temperature=0.0,
             max_tokens=128,
         )
+        if response.usage:
+            self.last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
         raw = response.choices[0].message.content or ""
         try:
             parsed = json.loads(raw)
@@ -48,4 +55,10 @@ class GroqAdapter:
             temperature=0.3,
             max_tokens=300,
         )
+        if response.usage:
+            self.last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
         return response.choices[0].message.content or ""

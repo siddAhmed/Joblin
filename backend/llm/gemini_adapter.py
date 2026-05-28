@@ -11,6 +11,7 @@ class GeminiAdapter:
 
     def __init__(self, api_key: str):
         self._client = genai.Client(api_key=api_key)
+        self.last_usage: dict = {}
 
     async def filter(
         self,
@@ -27,6 +28,12 @@ class GeminiAdapter:
             model=self.FILTER_MODEL,
             contents=prompt,
         )
+        if response.usage_metadata:
+            self.last_usage = {
+                "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
+                "completion_tokens": response.usage_metadata.candidates_token_count or 0,
+                "total_tokens": response.usage_metadata.total_token_count or 0,
+            }
         raw = response.text or ""
         try:
             start = raw.find("{")
@@ -48,4 +55,10 @@ class GeminiAdapter:
             model=self.SUMMARIZE_MODEL,
             contents=prompt,
         )
+        if response.usage_metadata:
+            self.last_usage = {
+                "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
+                "completion_tokens": response.usage_metadata.candidates_token_count or 0,
+                "total_tokens": response.usage_metadata.total_token_count or 0,
+            }
         return response.text or ""

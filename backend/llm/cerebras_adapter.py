@@ -9,6 +9,7 @@ class CerebrasAdapter:
     def __init__(self, api_key: str):
         self._client = AsyncCerebras(api_key=api_key)
         self._model = "llama-3.3-70b"
+        self.last_usage: dict = {}
 
     async def filter(
         self,
@@ -25,6 +26,12 @@ class CerebrasAdapter:
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             max_tokens=128,
         )
+        if response.usage:
+            self.last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
         raw = response.choices[0].message.content or ""
         try:
             parsed = json.loads(raw)
@@ -45,4 +52,10 @@ class CerebrasAdapter:
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400,
         )
+        if response.usage:
+            self.last_usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
         return response.choices[0].message.content or ""
