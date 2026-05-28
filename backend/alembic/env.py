@@ -15,6 +15,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+db_url = os.getenv("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+
 
 def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
