@@ -55,3 +55,11 @@ async def stats(session: AsyncSession = Depends(get_session)):
         "quarantine_count": quarantine_count,
         "last_run_completed_at": last_run,
     }
+
+
+@router.get("/onboarding-status")
+async def onboarding_status(session: AsyncSession = Depends(get_session)):
+    company_count = (await session.execute(
+        select(func.count()).select_from(Company)
+    )).scalar_one()
+    return {"needs_onboarding": company_count == 0}
