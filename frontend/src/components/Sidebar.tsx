@@ -25,7 +25,7 @@ export function Sidebar({ quarantineCount = 0 }: { quarantineCount?: number }) {
     return (
       <aside className="flex flex-col items-center w-11 bg-[#111] border-r border-[#1e1e1e] shrink-0 py-3">
         <div className="flex flex-col items-center pb-3 border-b border-[#1e1e1e] w-full mb-2 gap-1.5">
-          <div className="font-black text-[#4e9eff] text-sm">J</div>
+          <img src="/joblin_mascot.png" alt="Joblin" className="w-7 h-7 rounded object-contain" />
           <button onClick={() => setCollapsed(false)} title="Expand sidebar"
             className="text-[#555] hover:text-[#888] text-xs border border-[#2a2a2a] rounded w-7 h-5 flex items-center justify-center">
             &rsaquo;
@@ -52,7 +52,10 @@ export function Sidebar({ quarantineCount = 0 }: { quarantineCount?: number }) {
   return (
     <aside className="flex flex-col w-44 bg-[#111] border-r border-[#1e1e1e] shrink-0 py-3">
       <div className="flex items-center justify-between px-3 pb-3 border-b border-[#1e1e1e] mb-2">
-        <span className="font-bold text-sm text-[#e5e5e5]">Job<span className="text-[#4e9eff]">lin</span></span>
+        <div className="flex items-center gap-1.5">
+          <img src="/joblin_mascot.png" alt="Joblin" className="w-6 h-6 rounded object-contain" />
+          <span className="font-bold text-sm text-[#e5e5e5]">Job<span className="text-[#4e9eff]">lin</span></span>
+        </div>
         <button onClick={() => setCollapsed(true)}
           className="text-[#555] hover:text-[#888] text-xs border border-[#2a2a2a] rounded w-5 h-5 flex items-center justify-center">
           &lsaquo;
