@@ -100,3 +100,96 @@ async def test_greenhouse_returns_scraped_jobs():
     assert jobs[0].ats_id == "9001"
     assert jobs[0].title == "Senior Backend Engineer"
     assert "backend engineer" in jobs[0].raw_description.lower()
+
+
+from backend.scrapers.lever import fetch_lever_jobs
+
+
+async def test_lever_returns_scraped_jobs():
+    from unittest.mock import MagicMock
+    mock_data = [
+        {
+            "id": "abc-123",
+            "text": "Senior Engineer",
+            "categories": {"location": "Remote"},
+            "hostedUrl": "https://jobs.lever.co/stripe/abc-123",
+            "descriptionPlain": "Great Python role.",
+        }
+    ]
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = mock_data
+
+    with patch("backend.scrapers.lever.httpx.AsyncClient") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get = AsyncMock(return_value=mock_response)
+        jobs = await fetch_lever_jobs("stripe")
+
+    assert len(jobs) == 1
+    assert jobs[0].ats_id == "abc-123"
+    assert jobs[0].title == "Senior Engineer"
+
+
+from backend.scrapers.ashby import fetch_ashby_jobs
+
+
+async def test_ashby_returns_scraped_jobs():
+    from unittest.mock import MagicMock
+    mock_data = {
+        "jobs": [
+            {
+                "id": "ashby-001",
+                "title": "Staff Engineer",
+                "jobPostingLocations": [{"name": "San Francisco, CA"}],
+                "jobUrl": "https://jobs.ashbyhq.com/stripe/ashby-001",
+                "descriptionHtml": "<p>Great role at Stripe.</p>",
+            }
+        ]
+    }
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = mock_data
+
+    with patch("backend.scrapers.ashby.httpx.AsyncClient") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get = AsyncMock(return_value=mock_response)
+        jobs = await fetch_ashby_jobs("stripe")
+
+    assert len(jobs) == 1
+    assert jobs[0].ats_id == "ashby-001"
+    assert jobs[0].title == "Staff Engineer"
+
+
+from backend.scrapers.workday import _extract_workday_tenant
+
+
+def test_workday_tenant_extraction():
+    tenant, wd_num = _extract_workday_tenant(
+        "https://stripe.wd5.myworkdayjobs.com/en-US/External/jobs"
+    )
+    assert tenant == "stripe"
+    assert wd_num == "wd5"
+
+
+def test_workday_tenant_extraction_fails_gracefully():
+    tenant, wd_num = _extract_workday_tenant("https://example.com/careers")
+    assert tenant is None
+
+
+from backend.scrapers.crawl4ai import fetch_crawl4ai_jobs
+
+
+async def test_crawl4ai_returns_empty_on_no_jobs():
+    from unittest.mock import MagicMock
+    mock_result = MagicMock()
+    mock_result.success = True
+    mock_result.markdown = "No open positions at this time."
+
+    with patch("backend.scrapers.crawl4ai.AsyncWebCrawler") as MockCrawler:
+        instance = MockCrawler.return_value.__aenter__.return_value
+        instance.arun = AsyncMock(return_value=mock_result)
+        jobs = await fetch_crawl4ai_jobs("https://example.com/careers", css_selector=None)
+
+    assert jobs == []

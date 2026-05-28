@@ -32,11 +32,39 @@ def _normalize(text: str) -> str:
 
 
 async def _fetch_jobs(company: Company) -> list[ScrapedJob]:
-    from backend.scrapers import greenhouse as gh_mod
+    from backend.scrapers import (
+        greenhouse as gh_mod,
+        lever as lever_mod,
+        ashby as ashby_mod,
+        workable as workable_mod,
+        smartrecruiters as sr_mod,
+        workday as wd_mod,
+        crawl4ai as c4ai_mod,
+    )
 
-    if company.ats_type.value == "greenhouse":
+    ats = company.ats_type.value if company.ats_type else "crawl4ai"
+
+    if ats == "greenhouse":
         return await gh_mod.fetch_greenhouse_jobs(company.ats_identifier or "")
-    return []
+    if ats == "lever":
+        return await lever_mod.fetch_lever_jobs(company.ats_identifier or "")
+    if ats == "ashby":
+        return await ashby_mod.fetch_ashby_jobs(company.ats_identifier or "")
+    if ats == "workable":
+        return await workable_mod.fetch_workable_jobs(company.ats_identifier or "")
+    if ats == "smartrecruiters":
+        return await sr_mod.fetch_smartrecruiters_jobs(company.ats_identifier or "")
+    if ats == "workday":
+        return await wd_mod.fetch_workday_jobs(company.custom_api_url or company.careers_url)
+    if ats == "custom":
+        return await c4ai_mod.fetch_crawl4ai_jobs(
+            company.custom_api_url or company.careers_url,
+            css_selector=company.css_selector,
+        )
+    return await c4ai_mod.fetch_crawl4ai_jobs(
+        company.careers_url,
+        css_selector=company.css_selector,
+    )
 
 
 async def execute_run(run_id: int, session: AsyncSession) -> None:
