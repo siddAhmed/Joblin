@@ -30,6 +30,7 @@ RUN playwright install chromium --with-deps
 
 # Copy application code
 COPY backend/ ./backend/
+COPY presets/ ./presets/
 COPY alembic.ini ./
 
 # Copy built frontend into the static directory FastAPI serves
