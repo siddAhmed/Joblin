@@ -3,7 +3,7 @@ import { usageApi } from "@/api/usage";
 import type { ProviderStats } from "@/api/usage";
 
 const PROVIDER_LABELS: Record<string, { name: string; dashboard: string }> = {
-  groq: { name: "Groq", dashboard: "https://console.groq.com/usage" },
+  groq: { name: "Groq", dashboard: "https://console.groq.com/dashboard/usage" },
   cerebras: { name: "Cerebras", dashboard: "https://cloud.cerebras.ai" },
   gemini: { name: "Gemini", dashboard: "https://aistudio.google.com/app/usage" },
 };
