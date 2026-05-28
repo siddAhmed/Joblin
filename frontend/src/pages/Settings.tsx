@@ -155,21 +155,25 @@ export function Settings() {
                 <select value={(s.groq_filter_model as string) || "llama-3.1-8b-instant"}
                   onChange={(e) => update.mutate({ groq_filter_model: e.target.value })}
                   className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
-                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                  <option value="llama-3.2-11b-text-preview">llama-3.2-11b-text-preview</option>
-                  <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant — 14.4K RPD, fast</option>
+                  <option value="meta-llama/llama-4-scout-17b-16e-instruct">llama-4-scout-17b — 1K RPD, 30K TPM</option>
+                  <option value="qwen/qwen3-32b">qwen3-32b — 1K RPD, 60 RPM</option>
+                  <option value="openai/gpt-oss-20b">gpt-oss-20b — 1K RPD</option>
+                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile — 1K RPD, quality</option>
+                  <option value="openai/gpt-oss-120b">gpt-oss-120b — 1K RPD, largest</option>
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-[#888] mb-1">Summarize model</label>
-                <select value={(s.groq_summarize_model as string) || "llama-3.1-8b-instant"}
+                <select value={(s.groq_summarize_model as string) || "llama-3.3-70b-versatile"}
                   onChange={(e) => update.mutate({ groq_summarize_model: e.target.value })}
                   className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
-                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                  <option value="llama-3.2-11b-text-preview">llama-3.2-11b-text-preview</option>
-                  <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile — 1K RPD, quality</option>
+                  <option value="openai/gpt-oss-120b">gpt-oss-120b — 1K RPD, largest</option>
+                  <option value="meta-llama/llama-4-scout-17b-16e-instruct">llama-4-scout-17b — 1K RPD, 30K TPM</option>
+                  <option value="qwen/qwen3-32b">qwen3-32b — 1K RPD, 60 RPM</option>
+                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant — 14.4K RPD, fast</option>
+                  <option value="openai/gpt-oss-20b">gpt-oss-20b — 1K RPD</option>
                 </select>
               </div>
             </div>
@@ -208,10 +212,10 @@ export function Settings() {
                 <select value={(s.gemini_filter_model as string) || "gemini-2.0-flash-lite"}
                   onChange={(e) => update.mutate({ gemini_filter_model: e.target.value })}
                   className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite — 15 RPM, 500 RPD</option>
+                  <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite — 10 RPM, 20 RPD</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash — 5 RPM, 20 RPD</option>
                   <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
                 </select>
               </div>
               <div>
@@ -219,10 +223,10 @@ export function Settings() {
                 <select value={(s.gemini_summarize_model as string) || "gemini-2.0-flash-lite"}
                   onChange={(e) => update.mutate({ gemini_summarize_model: e.target.value })}
                   className="w-full bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]">
+                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite — 15 RPM, 500 RPD</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash — 5 RPM, 20 RPD</option>
+                  <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite — 10 RPM, 20 RPD</option>
                   <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
                 </select>
               </div>
             </div>
