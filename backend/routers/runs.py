@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session, AsyncSessionLocal
-from backend.models.run import Run, RunCompanyResult
-from backend.pipeline import execute_run, get_run_queue
+from backend.models.run import Run, RunCompanyResult, RunStatus
+from backend.pipeline import execute_run, get_run_queue, request_cancel_run
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -67,6 +67,17 @@ async def get_run(run_id: int, session: Session):
             for r in results
         ],
     }
+
+
+@router.post("/{run_id}/cancel")
+async def cancel_run(run_id: int, session: Session):
+    run = await session.get(Run, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if run.status != RunStatus.running:
+        raise HTTPException(status_code=409, detail="Run is not running")
+    request_cancel_run(run_id)
+    return {"id": run_id, "status": "cancelling"}
 
 
 @router.get("/{run_id}/stream")

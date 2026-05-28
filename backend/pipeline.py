@@ -14,6 +14,11 @@ from backend.scrapers.heuristics import passes_heuristic
 from backend.scrapers.job_id import compute_job_id
 
 _run_queues: dict[int, asyncio.Queue] = {}
+_cancelled_runs: set[int] = set()
+
+
+def request_cancel_run(run_id: int) -> None:
+    _cancelled_runs.add(run_id)
 
 
 def get_run_queue(run_id: int) -> asyncio.Queue:
@@ -112,6 +117,15 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     total_found = total_heuristic = total_confirmed = total_notified = 0
 
     for company in companies:
+        if run_id in _cancelled_runs:
+            _cancelled_runs.discard(run_id)
+            run.status = RunStatus.cancelled
+            run.completed_at = datetime.now(timezone.utc)
+            await session.commit()
+            await _emit(run_id, "run_done", {"run_id": run_id, "status": "cancelled", "total_confirmed": total_confirmed})
+            _run_queues.pop(run_id, None)
+            return
+
         result_row = RunCompanyResult(
             run_id=run_id, company_id=company.id, status=CompanyResultStatus.scraping
         )
