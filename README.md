@@ -242,6 +242,50 @@ ATS detection is automatic when you add a company. You can override the detected
 
 ---
 
+## Updating after code changes
+
+### With Docker Compose
+
+```bash
+cd ~/joblin
+git pull
+sudo docker compose build && sudo docker compose up -d
+```
+
+Compose only rebuilds layers that changed. Python dependency changes rebuild from the `pip install` layer; frontend changes rebuild from `npm ci`. Unchanged layers are cached.
+
+### Without Compose (direct docker run)
+
+```bash
+cd ~/joblin
+git pull
+sudo docker stop joblin && sudo docker rm joblin
+sudo docker build -t joblin .
+sudo docker run -d --name joblin \
+  -p 8000:8000 \
+  -v joblin_data:/app/data \
+  --env-file .env \
+  -e DATABASE_URL=sqlite+aiosqlite:////app/data/joblin.db \
+  joblin
+sudo docker logs -f joblin
+```
+
+The `joblin_data` volume persists the database across rebuilds. New Alembic migrations run automatically on startup.
+
+### WSL2 tip
+
+If building from `/mnt/c/...` (Windows filesystem) is slow, sync to native ext4 first:
+
+```bash
+rsync -av --delete /mnt/c/dev/joblin/ ~/joblin/ \
+  --exclude='.git' --exclude='.venv' --exclude='frontend/node_modules' \
+  --exclude='frontend/dist' --exclude='*.db'
+```
+
+Then build from `~/joblin`.
+
+---
+
 ## Development setup
 
 ### Prerequisites
