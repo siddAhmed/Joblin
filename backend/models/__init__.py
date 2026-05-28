@@ -4,6 +4,7 @@ from backend.models.match import Match, MatchTier
 from backend.models.run import Run, RunCompanyResult, RunStatus, CompanyResultStatus
 from backend.models.setting import Setting
 from backend.models.feedback import FeedbackExample
+from backend.models.token_usage import TokenUsage
 
 __all__ = [
     "Company", "AtsType",
@@ -12,4 +13,5 @@ __all__ = [
     "Run", "RunCompanyResult", "RunStatus", "CompanyResultStatus",
     "Setting",
     "FeedbackExample",
+    "TokenUsage",
 ]
