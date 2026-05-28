@@ -1,4 +1,4 @@
-http://{$PUBLIC_HOSTNAME} {
+:80 {
     basic_auth /* {
         joblin {$CADDY_HASHED_PASSWORD}
     }
