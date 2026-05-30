@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
@@ -50,6 +51,7 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
 }
 
 export function Matches() {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [tier, setTier] = useState("");
   const qc = useQueryClient();
@@ -66,9 +68,17 @@ export function Matches() {
           <option value="borderline">Borderline</option>
         </select>
         {selected.size > 0 && (
-          <button onClick={() => bulkNotify.mutate()} className="text-xs border border-[#4e9eff] rounded px-3 py-1 text-[#4e9eff] bg-[#0e2040]">
-            Re-notify {selected.size} selected
-          </button>
+          <>
+            <button onClick={() => bulkNotify.mutate()} className="text-xs border border-[#4e9eff] rounded px-3 py-1 text-[#4e9eff] bg-[#0e2040]">
+              Re-notify {selected.size} selected
+            </button>
+            <button
+              onClick={() => navigate(`/insights?analyze=${Array.from(selected).join(",")}`)}
+              className="text-xs border border-[#2a2a2a] rounded px-3 py-1 text-[#888] hover:text-[#ccc]"
+            >
+              Analyze skills ({selected.size})
+            </button>
+          </>
         )}
       </div>
       {isLoading && <p className="text-[#555] text-sm">Loading...</p>}
