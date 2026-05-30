@@ -11,6 +11,7 @@ import { RunDetail } from "./pages/RunDetail";
 import { Settings } from "./pages/Settings";
 import { Onboarding } from "./pages/Onboarding";
 import { Usage } from "./pages/Usage";
+import { Insights } from "./pages/Insights";
 
 function AppInner() {
   const { data, isLoading, refetch } = useQuery({
@@ -31,6 +32,7 @@ function AppInner() {
         <Route path="/runs" element={<Runs />} />
         <Route path="/runs/:id" element={<RunDetail />} />
         <Route path="/usage" element={<Usage />} />
+        <Route path="/insights" element={<Insights />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
