@@ -2,7 +2,7 @@ import json
 from google import genai
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt
+from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt
 
 
 class GeminiAdapter:
@@ -64,3 +64,18 @@ class GeminiAdapter:
         )
         self._record_usage(response)
         return response.text or ""
+
+    async def extract_skills(self, title: str, description: str) -> list[str]:
+        prompt = build_skills_prompt(title, description)
+        response = await self._client.aio.models.generate_content(
+            model=self._filter_model,
+            contents=prompt,
+        )
+        self._record_usage(response)
+        raw = response.text or ""
+        try:
+            start = raw.find("[")
+            end = raw.rfind("]") + 1
+            return json.loads(raw[start:end])
+        except Exception:
+            return []

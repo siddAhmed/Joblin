@@ -60,3 +60,18 @@ def build_summarize_prompt(
         f"Job: {title} at {company_name} (relevance score: {score:.2f})\n"
         f"Description:\n{description[:3000]}"
     )
+
+
+def build_skills_prompt(title: str, description: str) -> str:
+    return (
+        "Extract skills from this job description. Return a JSON array of canonical skill name strings only. "
+        "Include: programming languages, frameworks, libraries, databases, cloud platforms, infrastructure tools, "
+        "and specific technical domain skills such as 'system design', 'distributed systems', 'API design', "
+        "'event-driven architecture', 'data modeling'. "
+        "Exclude generic soft skills like communication, ownership, leadership, or collaboration. "
+        "Use canonical names: 'PostgreSQL' not 'Postgres', 'React' not 'React.js', "
+        "'Kubernetes' not 'k8s', 'TypeScript' not 'TS'. "
+        "Return only the JSON array with no other text, markdown, or explanation.\n\n"
+        f"Job title: {title}\n"
+        f"Description:\n{description[:3000]}"
+    )

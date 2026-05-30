@@ -2,7 +2,7 @@ import json
 from groq import AsyncGroq
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt
+from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt
 
 
 class GroqAdapter:
@@ -62,3 +62,20 @@ class GroqAdapter:
         )
         self._record_usage(response.usage)
         return response.choices[0].message.content or ""
+
+    async def extract_skills(self, title: str, description: str) -> list[str]:
+        prompt = build_skills_prompt(title, description)
+        response = await self._client.chat.completions.create(
+            model=self._filter_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=512,
+        )
+        self._record_usage(response.usage)
+        raw = response.choices[0].message.content or ""
+        try:
+            start = raw.find("[")
+            end = raw.rfind("]") + 1
+            return json.loads(raw[start:end])
+        except Exception:
+            return []
