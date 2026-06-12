@@ -44,3 +44,28 @@ async def save_resume(body: ResumeSave, session: Session):
         resume.updated_at = now
     await session.commit()
     return {"tex_content": resume.tex_content, "updated_at": resume.updated_at.isoformat()}
+
+
+class CompileRequest(BaseModel):
+    tex_content: str
+
+
+@router.post("/compile")
+async def compile_resume(body: CompileRequest):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tex_path = Path(tmpdir) / "resume.tex"
+        tex_path.write_text(body.tex_content, encoding="utf-8")
+        proc = await asyncio.create_subprocess_exec(
+            "tectonic", str(tex_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=tmpdir,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=422,
+                detail=stderr.decode("utf-8", errors="replace"),
+            )
+        pdf_bytes = (Path(tmpdir) / "resume.pdf").read_bytes()
+    return Response(content=pdf_bytes, media_type="application/pdf")
