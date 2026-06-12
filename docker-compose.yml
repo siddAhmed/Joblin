@@ -24,9 +24,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    environment:
-      - PUBLIC_HOSTNAME=${PUBLIC_HOSTNAME}
-      - CADDY_HASHED_PASSWORD
+    env_file:
+      - .env
 
 volumes:
   db_data:
