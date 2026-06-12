@@ -20,7 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtk-3-0 \
     libgbm1 \
     libasound2 \
+    libfontconfig1 \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Tectonic (lightweight LaTeX engine)
+RUN curl -L "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz" \
+    | tar xz -C /usr/local/bin \
+    && tectonic --version
 
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
