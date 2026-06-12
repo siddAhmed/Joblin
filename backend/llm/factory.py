@@ -46,3 +46,7 @@ def get_summarize_provider(settings: dict) -> LLMProvider:
             summarize_model=settings.get("gemini_summarize_model", "gemini-2.0-flash-lite"),
         )
     raise ValueError(f"Unknown summarize provider: {provider}")
+
+
+def get_tailor_provider(settings: dict) -> LLMProvider:
+    return get_summarize_provider(settings)

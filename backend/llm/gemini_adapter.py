@@ -2,7 +2,7 @@ import json
 from google import genai
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt
+from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt, build_tailor_prompt
 
 
 class GeminiAdapter:
@@ -79,3 +79,17 @@ class GeminiAdapter:
             return json.loads(raw[start:end])
         except Exception:
             return []
+
+    async def tailor_resume(self, tex_content: str, job_description: str) -> str:
+        system, user = build_tailor_prompt(tex_content, job_description)
+        prompt = f"{system}\n\n{user}"
+        response = await self._client.aio.models.generate_content(
+            model=self._summarize_model,
+            contents=prompt,
+        )
+        self._record_usage(response)
+        raw = response.text or ""
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1] if lines and lines[-1].strip() == "```" else lines[1:])
+        return raw.strip()

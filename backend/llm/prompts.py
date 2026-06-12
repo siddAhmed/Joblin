@@ -75,3 +75,19 @@ def build_skills_prompt(title: str, description: str) -> str:
         f"Job title: {title}\n"
         f"Description:\n{description[:3000]}"
     )
+
+
+def build_tailor_prompt(tex_content: str, job_description: str) -> tuple[str, str]:
+    system = (
+        "You are a resume tailoring expert. Given a LaTeX resume and a job description, "
+        "return ONLY the modified LaTeX source code. No explanation, no markdown code fences, "
+        "no commentary of any kind - just the raw .tex content."
+    )
+    user = (
+        f"Here is my LaTeX resume:\n\n{tex_content}\n\n"
+        f"Here is the job description:\n\n{job_description[:3000]}\n\n"
+        "Please modify the resume to emphasize skills and experience most relevant to this role. "
+        "Adjust bullet points to highlight matching technologies, and reorder content if beneficial. "
+        "Preserve the original LaTeX template structure and commands exactly."
+    )
+    return system, user

@@ -2,7 +2,7 @@ import json
 from cerebras.cloud.sdk import AsyncCerebras
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt
+from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt, build_tailor_prompt
 
 
 class CerebrasAdapter:
@@ -75,3 +75,20 @@ class CerebrasAdapter:
             return json.loads(raw[start:end])
         except Exception:
             return []
+
+    async def tailor_resume(self, tex_content: str, job_description: str) -> str:
+        system, user = build_tailor_prompt(tex_content, job_description)
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=4096,
+        )
+        self._record_usage(response.usage)
+        raw = response.choices[0].message.content or ""
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1] if lines and lines[-1].strip() == "```" else lines[1:])
+        return raw.strip()
