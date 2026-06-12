@@ -9,6 +9,7 @@ from backend.database import AsyncSessionLocal
 from backend.routers import system, companies, runs as runs_router, jobs, matches, settings as settings_router, presets
 from backend.routers.admin import router as admin_router
 from backend.routers.insights import router as insights_router
+from backend.routers.resume import router as resume_router
 from backend.routers.usage import router as usage_router
 
 
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(usage_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
     app.include_router(insights_router, prefix="/api")
+    app.include_router(resume_router, prefix="/api")
     if FRONTEND_DIST.exists():
         app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")
     return app
