@@ -7,6 +7,7 @@ import { jobsApi } from "@/api/jobs";
 import { formatScore } from "@/lib/utils";
 
 function MatchRow({ match, selected, onSelect }: { match: Match; selected: boolean; onSelect: () => void }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const { data: job } = useQuery({ queryKey: ["job", match.job_id], queryFn: () => jobsApi.get(match.job_id), enabled: expanded });
   const qc = useQueryClient();
@@ -43,6 +44,12 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
           <div className="flex gap-2 mt-3">
             <button onClick={() => dismiss.mutate()} className="text-[11px] border border-[#2a2a2a] rounded px-2 py-1 text-[#888] hover:text-[#ccc]">Not interested</button>
             {applyUrl && <a href={applyUrl} target="_blank" rel="noreferrer" className="text-[11px] border border-[#4e9eff] rounded px-2 py-1 text-[#4e9eff] hover:bg-[#0e2040]">Apply</a>}
+            <button
+              onClick={() => navigate(`/resume?jobId=${match.job_id}`)}
+              className="text-[11px] border border-[#4e4e9f] rounded px-2 py-1 text-[#a78bfa] hover:bg-[#1a1a3a]"
+            >
+              ✦ Tailor Resume
+            </button>
           </div>
         </div>
       )}
