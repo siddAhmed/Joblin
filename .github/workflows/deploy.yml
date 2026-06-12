@@ -11,6 +11,7 @@ jobs:
     steps:
       - name: Pull and redeploy
         run: |
+          git config --global --add safe.directory /home/actions-runner/Joblin
           cd /home/actions-runner/Joblin
           git pull origin main
           docker compose up -d --build
