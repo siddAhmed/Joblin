@@ -72,6 +72,7 @@ async def test_compile_resume_failure(client):
 @pytest.fixture
 async def seeded_job_id(app):
     override = app.dependency_overrides[get_session]
+    job_id = None
     async for session in override():
         company = Company(
             name="Stripe",
@@ -90,7 +91,8 @@ async def seeded_job_id(app):
         )
         session.add(job)
         await session.commit()
-        return job.id
+        job_id = job.id
+    return job_id
 
 
 async def test_tailor_resume_404_no_resume(client):

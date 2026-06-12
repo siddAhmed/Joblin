@@ -63,7 +63,11 @@ async def compile_resume(body: CompileRequest):
             stderr=asyncio.subprocess.PIPE,
             cwd=tmpdir,
         )
-        _, stderr = await proc.communicate()
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=60.0)
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise HTTPException(status_code=422, detail="Compilation timed out after 60 seconds")
         if proc.returncode != 0:
             raise HTTPException(
                 status_code=422,
@@ -90,8 +94,13 @@ async def tailor_resume_endpoint(body: TailorRequest, session: Session):
 
     settings = await get_all_settings(session)
     provider = get_tailor_provider(settings)
+    if not job.raw_description:
+        raise HTTPException(
+            status_code=422,
+            detail="This job has no description yet. Run a scan to fetch full job details first.",
+        )
     tailored_tex = await provider.tailor_resume(
         tex_content=resume.tex_content,
-        job_description=job.raw_description or job.title,
+        job_description=job.raw_description,
     )
     return {"tex_content": tailored_tex}

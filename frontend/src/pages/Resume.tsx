@@ -22,6 +22,8 @@ export function Resume() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [isTailoring, setIsTailoring] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
+  const [tailorError, setTailorError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data: matches = [] } = useQuery({
     queryKey: ["matches", ""],
@@ -46,11 +48,22 @@ export function Resume() {
     }
   }, [searchParams, matches]);
 
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
+
   async function handleSave() {
-    const data = await resumeApi.save(editorContent);
-    setReferenceContent(data.tex_content);
-    setReferenceUpdatedAt(data.updated_at);
-    setTailoredFor(null);
+    setSaveError(null);
+    try {
+      const data = await resumeApi.save(editorContent);
+      setReferenceContent(data.tex_content);
+      setReferenceUpdatedAt(data.updated_at);
+      setTailoredFor(null);
+    } catch {
+      setSaveError("Failed to save. Please try again.");
+    }
   }
 
   async function handleCompile() {
@@ -62,7 +75,16 @@ export function Resume() {
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       setPdfUrl(URL.createObjectURL(blob));
     } catch (err: any) {
-      setCompileError(err?.response?.data?.detail || "Compilation failed");
+      let detail = "Compilation failed";
+      try {
+        const raw = err?.response?.data;
+        if (raw instanceof ArrayBuffer) {
+          detail = JSON.parse(new TextDecoder().decode(raw))?.detail || detail;
+        } else if (raw?.detail) {
+          detail = raw.detail;
+        }
+      } catch {}
+      setCompileError(detail);
     } finally {
       setIsCompiling(false);
     }
@@ -71,6 +93,7 @@ export function Resume() {
   async function handleTailor() {
     if (!selectedJobId) return;
     setIsTailoring(true);
+    setTailorError(null);
     try {
       const result = await resumeApi.tailor(Number(selectedJobId));
       setEditorContent(result.tex_content);
@@ -80,6 +103,8 @@ export function Resume() {
         title: match?.job_title ?? "Unknown",
         company: match?.company_name ?? "Unknown",
       });
+    } catch (err: any) {
+      setTailorError(err?.response?.data?.detail || "Tailoring failed");
     } finally {
       setIsTailoring(false);
     }
@@ -229,6 +254,27 @@ export function Resume() {
       <div className="px-4 py-1.5 border-b border-[#1e1e1e] bg-[#0a0a0a] text-[11px] shrink-0">
         {renderStatusBar()}
       </div>
+
+      {/* Save error */}
+      {saveError && (
+        <div className="px-4 py-1 bg-red-950/20 border-b border-red-900/30 text-[10px] text-red-500 flex items-center justify-between shrink-0">
+          <span>{saveError}</span>
+          <button onClick={() => setSaveError(null)} className="ml-2 text-red-700 hover:text-red-500">✕</button>
+        </div>
+      )}
+
+      {/* Tailor error */}
+      {tailorError && (
+        <div className="px-4 py-2 bg-red-950/30 border-b border-red-900/40 text-[11px] text-red-400 flex items-start justify-between shrink-0">
+          <span className="flex-1">{tailorError}</span>
+          <button
+            onClick={() => setTailorError(null)}
+            className="ml-2 text-red-600 hover:text-red-400 shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Compile error */}
       {compileError && (
