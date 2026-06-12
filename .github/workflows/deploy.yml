@@ -1,0 +1,16 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull and redeploy
+        run: |
+          cd /root/dev/joblin
+          git pull origin main
+          docker compose up -d --build
