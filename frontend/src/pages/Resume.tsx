@@ -129,9 +129,18 @@ export function Resume() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setEditorContent(ev.target?.result as string);
+    reader.onload = async (ev) => {
+      const content = ev.target?.result as string;
+      setEditorContent(content);
       setTailoredFor(null);
+      setSaveError(null);
+      try {
+        const data = await resumeApi.save(content);
+        setReferenceContent(data.tex_content);
+        setReferenceUpdatedAt(data.updated_at);
+      } catch {
+        setSaveError("Failed to save uploaded file. Please save manually.");
+      }
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -146,6 +155,19 @@ export function Resume() {
         <span className="text-[#555]">
           No resume yet - upload a .tex file to get started
         </span>
+      );
+    }
+    if (!hasReference && editorContent) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="text-[#f59e0b]">Not saved as reference</span>
+          <button
+            onClick={handleSave}
+            className="text-[10px] border border-[#2a5c2a] rounded px-1.5 py-0.5 text-[#4ade80] hover:bg-[#1a3a1a]"
+          >
+            Save as Reference
+          </button>
+        </div>
       );
     }
     if (tailoredFor) {
