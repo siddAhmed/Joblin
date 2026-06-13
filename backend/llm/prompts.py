@@ -31,7 +31,10 @@ def build_filter_prompt(
     system = (
         "You are a job relevance filter. Score the job 0.0-1.0 against the criteria. "
         'Return JSON only: {"score": <float>, "reasoning": "<one sentence>"}. '
-        "Score >= 0.70 means strong match. 0.40-0.69 means borderline. < 0.40 means discard."
+        "Score >= 0.70 means strong match. 0.40-0.69 means borderline. < 0.40 means discard. "
+        "If the candidate's profile specifies a location or work authorization constraint, "
+        "score any job < 0.40 that is not in the candidate's country, not fully remote, "
+        "and does not explicitly mention visa sponsorship or work permit support."
     )
 
     user = (
