@@ -84,7 +84,10 @@ def build_tailor_prompt(tex_content: str, job_description: str) -> tuple[str, st
     system = (
         "You are a resume tailoring expert. Given a LaTeX resume and a job description, "
         "return ONLY the modified LaTeX source code. No explanation, no markdown code fences, "
-        "no commentary of any kind - just the raw .tex content."
+        "no commentary of any kind - just the raw .tex content. "
+        "Critical LaTeX rules: always escape special characters in text -- use \\& not &, "
+        "\\% not %, \\$ not $, \\# not #, \\_ not _ (outside math/commands). "
+        "Never introduce these characters unescaped inside \\textbf{}, \\textit{}, or any text context."
     )
     user = (
         f"Here is my LaTeX resume:\n\n{tex_content}\n\n"
