@@ -24,6 +24,9 @@ export function Resume() {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [downloadName, setDownloadName] = useState<string>(
+    () => localStorage.getItem("resume_download_filename") ?? "resume"
+  );
 
   const { data: matches = [] } = useQuery({
     queryKey: ["matches", ""],
@@ -117,11 +120,16 @@ export function Resume() {
     }
   }
 
+  function handleDownloadNameChange(name: string) {
+    setDownloadName(name);
+    localStorage.setItem("resume_download_filename", name);
+  }
+
   function handleDownload() {
     if (!pdfUrl) return;
     const a = document.createElement("a");
     a.href = pdfUrl;
-    a.download = "resume.pdf";
+    a.download = `${downloadName.trim() || "resume"}.pdf`;
     a.click();
   }
 
@@ -254,13 +262,23 @@ export function Resume() {
         >
           {isCompiling ? "Compiling..." : "▶ Compile"}
         </button>
-        <button
-          onClick={handleDownload}
-          disabled={!pdfUrl}
-          className="text-xs border border-[#2a2a2a] rounded px-3 py-1 text-[#888] hover:text-[#ccc] disabled:opacity-40"
-        >
-          ↓ PDF
-        </button>
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={downloadName}
+            onChange={(e) => handleDownloadNameChange(e.target.value)}
+            placeholder="resume"
+            className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-[#ccc] w-28 focus:outline-none focus:border-[#444]"
+          />
+          <span className="text-[11px] text-[#444]">.pdf</span>
+          <button
+            onClick={handleDownload}
+            disabled={!pdfUrl}
+            className="text-xs border border-[#2a2a2a] rounded px-3 py-1 text-[#888] hover:text-[#ccc] disabled:opacity-40"
+          >
+            ↓ PDF
+          </button>
+        </div>
         <label className="ml-auto cursor-pointer text-xs border border-[#2a2a2a] rounded px-3 py-1 text-[#888] hover:text-[#ccc]">
           Upload .tex
           <input
