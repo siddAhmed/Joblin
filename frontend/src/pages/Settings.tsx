@@ -34,8 +34,7 @@ function ScheduleTab({
   }
 
   const showTime =
-    state.preset !== "custom" || (state.preset === "custom" && state.customMode === "interval" && state.intervalUnit === "days");
-  const showTimezone = showTime;
+    state.preset !== "custom" || (state.customMode === "interval" && state.intervalUnit === "days");
   const showDayPicker = state.preset === "weekly";
 
   return (
@@ -95,7 +94,7 @@ function ScheduleTab({
                     type="number"
                     min={1}
                     value={state.intervalValue}
-                    onChange={(e) => setState((s) => ({ ...s, intervalValue: parseInt(e.target.value) || 1 }))}
+                    onChange={(e) => setState((s) => ({ ...s, intervalValue: Math.max(1, parseInt(e.target.value) || 1) }))}
                     onBlur={() => save(state)}
                     className="w-14 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
                   />
@@ -109,6 +108,7 @@ function ScheduleTab({
                   </select>
                 </div>
                 <button
+                  type="button"
                   onClick={() => update({ customMode: "cron" })}
                   className="text-xs text-[#4e4e88] underline mt-2"
                 >
@@ -120,12 +120,14 @@ function ScheduleTab({
                 <div className="text-xs text-[#666] mb-1.5">Cron expression</div>
                 <input
                   type="text"
-                  defaultValue={state.cronExpression}
+                  value={state.cronExpression}
+                  onChange={(e) => setState((s) => ({ ...s, cronExpression: e.target.value }))}
                   onBlur={(e) => update({ cronExpression: e.target.value })}
                   className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm text-[#e5e5e5] font-mono"
                   placeholder="0 */4 * * *"
                 />
                 <button
+                  type="button"
                   onClick={() => update({ customMode: "interval" })}
                   className="text-xs text-[#4e4e88] underline mt-2"
                 >
@@ -149,7 +151,7 @@ function ScheduleTab({
                 className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] font-mono"
               />
             </div>
-            {showTimezone && (
+            {showTime && (
               <div>
                 <div className="text-xs text-[#666] mb-1.5">Timezone</div>
                 <select
@@ -177,7 +179,7 @@ function ScheduleTab({
           <input
             type="number"
             defaultValue={(settings.staleness_threshold_hours as number) ?? 4}
-            onBlur={(e) => onSave({ staleness_threshold_hours: parseFloat(e.target.value) })}
+            onBlur={(e) => onSave({ staleness_threshold_hours: parseFloat(e.target.value) || 4 })}
             className="w-16 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
           />
           <span className="text-xs text-[#666]">hours</span>
@@ -206,7 +208,7 @@ export function Settings() {
   const [resetDone, setResetDone] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const qc = useQueryClient();
-  const { data: settings = {} as Record<string, unknown> } = useQuery({ queryKey: ["settings"], queryFn: settingsApi.get });
+  const { data: settings = {} as Record<string, unknown>, isSuccess: settingsLoaded } = useQuery({ queryKey: ["settings"], queryFn: settingsApi.get });
   const { data: presets = [] } = useQuery({ queryKey: ["presets"], queryFn: settingsApi.listPresets });
   const update = useMutation({ mutationFn: (data: Record<string, unknown>) => settingsApi.update(data), onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }) });
   const applyPreset = useMutation({ mutationFn: (name: string) => settingsApi.applyPreset(name), onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }) });
@@ -313,6 +315,7 @@ export function Settings() {
 
       {tab === "schedule" && (
         <ScheduleTab
+          key={settingsLoaded ? "loaded" : "loading"}
           settings={s}
           onSave={(data) => update.mutate(data)}
         />
