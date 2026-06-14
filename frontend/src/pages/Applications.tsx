@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  applicationsApi,
-  ApplicationTracking,
-  ApplicationStatus,
-} from "../api/applications";
+import { applicationsApi } from "../api/applications";
+import type { ApplicationTracking, ApplicationStatus } from "../api/applications";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

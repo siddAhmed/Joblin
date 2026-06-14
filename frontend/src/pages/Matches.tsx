@@ -5,7 +5,8 @@ import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
 import { jobsApi } from "@/api/jobs";
 import { formatScore } from "@/lib/utils";
-import { applicationsApi, ApplicationTracking, ApplicationStatus } from "@/api/applications";
+import { applicationsApi } from "@/api/applications";
+import type { ApplicationTracking, ApplicationStatus } from "@/api/applications";
 
 function TrackButtons({
   match,
