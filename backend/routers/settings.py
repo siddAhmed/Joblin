@@ -8,7 +8,6 @@ from backend.config import get_all_settings, set_setting
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.discord import post_match_to_discord
-from backend.scheduler import sync_user_schedule
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -28,6 +27,7 @@ async def update_settings(request: Request, body: dict, session: Session, curren
 
     scheduler = getattr(request.app.state, "scheduler", None)
     if scheduler is not None and SCHEDULE_KEYS & set(body.keys()):
+        from backend.scheduler import sync_user_schedule
         await sync_user_schedule(scheduler, current_user.id)
 
     return {"updated": list(body.keys())}
