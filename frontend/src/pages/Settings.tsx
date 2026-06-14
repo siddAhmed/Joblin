@@ -95,7 +95,7 @@ function ScheduleTab({
                     min={1}
                     value={state.intervalValue}
                     onChange={(e) => setState((s) => ({ ...s, intervalValue: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    onBlur={() => save(state)}
+                    onBlur={(e) => { const v = Math.max(1, parseInt(e.target.value) || 1); const next = { ...state, intervalValue: v }; setState(next); save(next); }}
                     className="w-14 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
                   />
                   <select
@@ -128,7 +128,7 @@ function ScheduleTab({
                 />
                 <button
                   type="button"
-                  onClick={() => update({ customMode: "interval" })}
+                  onClick={() => update({ customMode: "interval" }, false)}
                   className="text-xs text-[#4e4e88] underline mt-2"
                 >
                   ← Back to interval builder
@@ -147,7 +147,7 @@ function ScheduleTab({
                 type="time"
                 value={state.time}
                 onChange={(e) => setState((s) => ({ ...s, time: e.target.value }))}
-                onBlur={() => save(state)}
+                onBlur={(e) => { const next = { ...state, time: e.target.value }; setState(next); save(next); }}
                 className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] font-mono"
               />
             </div>
@@ -179,7 +179,7 @@ function ScheduleTab({
           <input
             type="number"
             defaultValue={(settings.staleness_threshold_hours as number) ?? 4}
-            onBlur={(e) => onSave({ staleness_threshold_hours: parseFloat(e.target.value) || 4 })}
+            onBlur={(e) => { const v = parseFloat(e.target.value); onSave({ staleness_threshold_hours: Number.isNaN(v) ? 4 : v }); }}
             className="w-16 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
           />
           <span className="text-xs text-[#666]">hours</span>
