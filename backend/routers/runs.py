@@ -88,7 +88,7 @@ async def cancel_run(run_id: int, session: Session, current_user: CurrentUser):
 
 
 @router.get("/{run_id}/stream")
-async def stream_run(run_id: int):
+async def stream_run(run_id: int, current_user: CurrentUser):
     async def generator():
         q = get_run_queue(run_id)
         while True:

@@ -90,7 +90,8 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     if not run:
         return
 
-    settings = await get_all_settings(session)
+    user_id = run.user_id
+    settings = await get_all_settings(session, user_id=user_id)
     criteria = CriteriaConfig.from_dict(settings.get("criteria") or {})
     quarantine_threshold = int(settings.get("quarantine_threshold") or 3)
     is_preview = run.is_preview
@@ -99,7 +100,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     summarize_provider = get_summarize_provider(settings)
 
     fb_rows = (await session.execute(
-        sa_select(FBModel).order_by(FBModel.dismissed_at.desc()).limit(5)
+        sa_select(FBModel).where(FBModel.user_id == user_id).order_by(FBModel.dismissed_at.desc()).limit(5)
     )).scalars().all()
     negative_examples = [
         FeedbackExample(
@@ -113,11 +114,11 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
 
     from sqlalchemy import func as sa_func
     existing_job_count = (await session.execute(
-        sa_select(sa_func.count()).select_from(Job)
+        sa_select(sa_func.count()).select_from(Job).where(Job.user_id == user_id)
     )).scalar() or 0
     is_seeding_run = existing_job_count == 0
 
-    stmt = sa_select(Company).where(Company.is_active == True)
+    stmt = sa_select(Company).where(Company.is_active == True, Company.user_id == user_id)
     if run.company_ids:
         stmt = stmt.where(Company.id.in_(run.company_ids))
     companies = (await session.execute(stmt)).scalars().all()
@@ -181,6 +182,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
                 normalized_title=_normalize(sj.title),
                 normalized_location=_normalize(sj.location or ""),
                 is_active=True,
+                user_id=company.user_id,
             )
             session.add(job)
             await session.flush()
