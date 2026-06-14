@@ -30,7 +30,7 @@ async def get_stats(session: Session):
     applied = counts.get(ApplicationStatus.applied, 0)
     offer = counts.get(ApplicationStatus.offer, 0)
 
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     daily_rows = (await session.execute(
         select(
             func.date(ApplicationTracking.created_at).label("day"),

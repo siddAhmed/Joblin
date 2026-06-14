@@ -263,6 +263,10 @@ export function Applications() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showModal, setShowModal] = useState(false);
 
+  useEffect(() => {
+    setSelected(new Set());
+  }, [statusFilter, sourceFilter, search]);
+
   const { data: apps = [], isLoading } = useQuery({
     queryKey: ["applications", statusFilter, sourceFilter, search],
     queryFn: () => applicationsApi.list({

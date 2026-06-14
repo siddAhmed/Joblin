@@ -45,7 +45,7 @@ function TrackButtons({
             ? "bg-purple-900/40 border-purple-800/60 text-purple-400"
             : "border-[#1e1e1e] text-[#666] hover:text-purple-400 hover:border-purple-900/60"
         }`}
-        onClick={() => track.mutate("interested")}
+        onClick={() => { if (!isInterested) track.mutate("interested"); }}
         disabled={track.isPending}
       >
         ★ Interested
@@ -56,7 +56,7 @@ function TrackButtons({
             ? "bg-blue-900/40 border-blue-800/60 text-blue-400"
             : "border-[#1e1e1e] text-[#666] hover:text-blue-400 hover:border-blue-900/60"
         }`}
-        onClick={() => track.mutate("applied")}
+        onClick={() => { if (!isApplied) track.mutate("applied"); }}
         disabled={track.isPending}
       >
         ✓ Applied
@@ -180,7 +180,7 @@ export function Matches() {
                       score: m.score,
                     })
                   )
-                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] }));
+                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] })).catch(() => {});
               }}
             >
               ★ Mark Interested
@@ -201,10 +201,21 @@ export function Matches() {
                       score: m.score,
                     })
                   )
-                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] }));
+                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] })).catch(() => {});
               }}
             >
               ✓ Mark Applied
+            </button>
+            <button
+              className="text-xs px-3 py-1 border border-[#1e1e1e] rounded text-[#666] hover:text-red-400 hover:border-red-900/60"
+              onClick={() => {
+                const toDismiss = matches.filter((m) => selected.has(m.id));
+                Promise.all(toDismiss.map((m) => jobsApi.dismiss(m.job_id)))
+                  .then(() => qc.invalidateQueries({ queryKey: ["matches"] }))
+                  .catch(() => {});
+              }}
+            >
+              ✕ Dismiss
             </button>
             <button onClick={() => bulkNotify.mutate()} className="text-xs border border-[#4e9eff] rounded px-3 py-1 text-[#4e9eff] bg-[#0e2040]">
               Re-notify {selected.size} selected
