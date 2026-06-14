@@ -13,11 +13,11 @@ async def _run_scrape_job() -> None:
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as session:
-        staleness_hours = float(await get_setting(session, "staleness_threshold_hours") or 4)
+        staleness_hours = float(await get_setting(session, "staleness_threshold_hours", user_id=1) or 4)
         cutoff = datetime.now(timezone.utc) - timedelta(hours=staleness_hours)
         last_run = (await session.execute(
             select(Run)
-            .where(Run.status == RunStatus.completed)
+            .where(Run.status == RunStatus.completed, Run.user_id == 1)
             .order_by(Run.completed_at.desc())
             .limit(1)
         )).scalar_one_or_none()
@@ -25,7 +25,7 @@ async def _run_scrape_job() -> None:
         if last_run and last_run.completed_at and last_run.completed_at > cutoff:
             return
 
-        run = Run(is_preview=False)
+        run = Run(is_preview=False, user_id=1)
         session.add(run)
         await session.commit()
         await session.refresh(run)
@@ -36,8 +36,8 @@ async def _run_scrape_job() -> None:
 
 async def start_scheduler(scheduler: AsyncScheduler) -> None:
     async with AsyncSessionLocal() as session:
-        cron_expr = await get_setting(session, "schedule_cron") or "0 */4 * * *"
-        enabled = await get_setting(session, "scheduler_enabled") or False
+        cron_expr = await get_setting(session, "schedule_cron", user_id=1) or "0 */4 * * *"
+        enabled = await get_setting(session, "scheduler_enabled", user_id=1) or False
 
     if not enabled:
         return

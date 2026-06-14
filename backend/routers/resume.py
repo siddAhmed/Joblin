@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_all_settings
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.llm.factory import get_tailor_provider
 from backend.models.job import Job
 from backend.models.resume import Resume
@@ -25,21 +26,23 @@ class ResumeSave(BaseModel):
 
 
 @router.get("")
-async def get_resume(session: Session):
-    result = await session.execute(select(Resume).where(Resume.id == 1))
-    resume = result.scalar_one_or_none()
+async def get_resume(session: Session, current_user: CurrentUser):
+    resume = (await session.execute(
+        select(Resume).where(Resume.user_id == current_user.id)
+    )).scalar_one_or_none()
     if resume is None:
         raise HTTPException(status_code=404, detail="No resume found")
     return {"tex_content": resume.tex_content, "updated_at": resume.updated_at.isoformat()}
 
 
 @router.put("")
-async def save_resume(body: ResumeSave, session: Session):
-    result = await session.execute(select(Resume).where(Resume.id == 1))
-    resume = result.scalar_one_or_none()
+async def save_resume(body: ResumeSave, session: Session, current_user: CurrentUser):
+    resume = (await session.execute(
+        select(Resume).where(Resume.user_id == current_user.id)
+    )).scalar_one_or_none()
     now = datetime.now(timezone.utc)
     if resume is None:
-        resume = Resume(id=1, tex_content=body.tex_content, updated_at=now)
+        resume = Resume(user_id=current_user.id, tex_content=body.tex_content, updated_at=now)
         session.add(resume)
     else:
         resume.tex_content = body.tex_content
@@ -82,17 +85,20 @@ class TailorRequest(BaseModel):
 
 
 @router.post("/tailor")
-async def tailor_resume_endpoint(body: TailorRequest, session: Session):
-    resume_result = await session.execute(select(Resume).where(Resume.id == 1))
-    resume = resume_result.scalar_one_or_none()
+async def tailor_resume_endpoint(body: TailorRequest, session: Session, current_user: CurrentUser):
+    resume = (await session.execute(
+        select(Resume).where(Resume.user_id == current_user.id)
+    )).scalar_one_or_none()
     if resume is None:
         raise HTTPException(status_code=404, detail="No reference resume found. Upload a .tex file first.")
 
-    job = await session.get(Job, body.job_id)
+    job = (await session.execute(
+        select(Job).where(Job.id == body.job_id, Job.user_id == current_user.id)
+    )).scalar_one_or_none()
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    settings = await get_all_settings(session)
+    settings = await get_all_settings(session, user_id=current_user.id)
     provider = get_tailor_provider(settings)
     if not job.raw_description:
         raise HTTPException(
