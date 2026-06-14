@@ -63,7 +63,7 @@ def upgrade() -> None:
     # 4. jobs: user_id derived from parent company
     if not _has_column(bind, "jobs", "user_id"):
         op.add_column("jobs", sa.Column("user_id", sa.Integer(), nullable=True))
-        op.execute("UPDATE jobs SET user_id = (SELECT c.user_id FROM companies c WHERE c.id = jobs.company_id)")
+        op.execute("UPDATE jobs SET user_id = COALESCE((SELECT c.user_id FROM companies c WHERE c.id = jobs.company_id), 1)")
         with op.batch_alter_table("jobs") as b:
             b.alter_column("user_id", existing_type=sa.Integer(), nullable=False)
 
@@ -116,8 +116,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Recreate old settings schema (key as PK, no user_id, no surrogate id)
     op.drop_table("settings")
-    op.rename_table("_settings_old", "settings")
+    op.create_table(
+        "settings",
+        sa.Column("key", sa.String(), primary_key=True),
+        sa.Column("value", sa.JSON(), nullable=True),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
+    )
     with op.batch_alter_table("resume") as b:
         b.drop_column("user_id")
     with op.batch_alter_table("feedback_examples") as b:
