@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_all_settings, set_setting
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.discord import post_match_to_discord
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -13,20 +14,20 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("")
-async def get_settings(session: Session):
-    return await get_all_settings(session)
+async def get_settings(session: Session, current_user: CurrentUser):
+    return await get_all_settings(session, user_id=current_user.id)
 
 
 @router.patch("")
-async def update_settings(body: dict, session: Session):
+async def update_settings(body: dict, session: Session, current_user: CurrentUser):
     for key, value in body.items():
-        await set_setting(session, key, value)
+        await set_setting(session, key, value, user_id=current_user.id)
     return {"updated": list(body.keys())}
 
 
 @router.post("/discord/test")
-async def test_discord(session: Session):
-    settings = await get_all_settings(session)
+async def test_discord(session: Session, current_user: CurrentUser):
+    settings = await get_all_settings(session, user_id=current_user.id)
     webhook_url = settings.get("discord_webhook_url", "")
     if not webhook_url:
         return {"error": "No webhook URL configured"}
@@ -53,11 +54,11 @@ class CriteriaTestRequest(BaseModel):
 
 
 @router.post("/criteria/test")
-async def test_criteria(req: CriteriaTestRequest, session: Session):
+async def test_criteria(req: CriteriaTestRequest, session: Session, current_user: CurrentUser):
     from backend.llm.factory import get_filter_provider
     from backend.llm.protocol import CriteriaConfig
 
-    settings = await get_all_settings(session)
+    settings = await get_all_settings(session, user_id=current_user.id)
     criteria = CriteriaConfig.from_dict(settings.get("criteria") or {})
     provider = get_filter_provider(settings)
     try:

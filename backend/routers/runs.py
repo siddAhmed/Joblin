@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session, AsyncSessionLocal
+from backend.dependencies.auth import CurrentUser
 from backend.models.run import Run, RunCompanyResult, RunStatus
 from backend.pipeline import execute_run, get_run_queue, request_cancel_run
 
@@ -22,8 +23,8 @@ class RunCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def start_run(req: RunCreate, background_tasks: BackgroundTasks, session: Session):
-    run = Run(is_preview=req.preview, company_ids=req.company_ids)
+async def start_run(req: RunCreate, background_tasks: BackgroundTasks, session: Session, current_user: CurrentUser):
+    run = Run(is_preview=req.preview, company_ids=req.company_ids, user_id=current_user.id)
     session.add(run)
     await session.commit()
     await session.refresh(run)
@@ -37,8 +38,10 @@ async def start_run(req: RunCreate, background_tasks: BackgroundTasks, session: 
 
 
 @router.get("")
-async def list_runs(session: Session):
-    rows = (await session.execute(select(Run).order_by(Run.started_at.desc()).limit(50))).scalars().all()
+async def list_runs(session: Session, current_user: CurrentUser):
+    rows = (await session.execute(
+        select(Run).where(Run.user_id == current_user.id).order_by(Run.started_at.desc()).limit(50)
+    )).scalars().all()
     return [
         {
             "id": r.id, "status": r.status, "is_preview": r.is_preview,
@@ -52,8 +55,10 @@ async def list_runs(session: Session):
 
 
 @router.get("/{run_id}")
-async def get_run(run_id: int, session: Session):
-    run = await session.get(Run, run_id)
+async def get_run(run_id: int, session: Session, current_user: CurrentUser):
+    run = (await session.execute(
+        select(Run).where(Run.id == run_id, Run.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     results = (await session.execute(
@@ -70,8 +75,10 @@ async def get_run(run_id: int, session: Session):
 
 
 @router.post("/{run_id}/cancel")
-async def cancel_run(run_id: int, session: Session):
-    run = await session.get(Run, run_id)
+async def cancel_run(run_id: int, session: Session, current_user: CurrentUser):
+    run = (await session.execute(
+        select(Run).where(Run.id == run_id, Run.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     if run.status != RunStatus.running:

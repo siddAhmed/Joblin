@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.models.job import Job
 from backend.models.match import Match
 from backend.models.company import Company
@@ -18,12 +19,13 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 @router.get("")
 async def list_jobs(
     session: Session,
+    current_user: CurrentUser,
     company_id: int | None = Query(None),
     search: str | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
 ):
-    stmt = select(Job).order_by(Job.first_seen_at.desc())
+    stmt = select(Job).where(Job.user_id == current_user.id).order_by(Job.first_seen_at.desc())
     if company_id:
         stmt = stmt.where(Job.company_id == company_id)
     if search:
@@ -41,8 +43,10 @@ async def list_jobs(
 
 
 @router.get("/{job_id}")
-async def get_job(job_id: int, session: Session):
-    job = await session.get(Job, job_id)
+async def get_job(job_id: int, session: Session, current_user: CurrentUser):
+    job = (await session.execute(
+        select(Job).where(Job.id == job_id, Job.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     match = (await session.execute(
@@ -57,8 +61,10 @@ async def get_job(job_id: int, session: Session):
 
 
 @router.post("/{job_id}/dismiss")
-async def dismiss_job(job_id: int, session: Session):
-    job = await session.get(Job, job_id)
+async def dismiss_job(job_id: int, session: Session, current_user: CurrentUser):
+    job = (await session.execute(
+        select(Job).where(Job.id == job_id, Job.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -77,11 +83,14 @@ async def dismiss_job(job_id: int, session: Session):
         normalized_title=job.normalized_title,
         normalized_location=job.normalized_location,
         summary=match.summary,
+        user_id=current_user.id,
     )
     session.add(fb)
 
     all_fb = (await session.execute(
-        select(FeedbackExample).order_by(FeedbackExample.dismissed_at.desc())
+        select(FeedbackExample)
+        .where(FeedbackExample.user_id == current_user.id)
+        .order_by(FeedbackExample.dismissed_at.desc())
     )).scalars().all()
     for old in all_fb[50:]:
         await session.delete(old)

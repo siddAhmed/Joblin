@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.models.application import ApplicationSource, ApplicationStatus, ApplicationTracking
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -14,15 +15,17 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 # /stats and /bulk MUST come before /{app_id}
 
 @router.get("/stats")
-async def get_stats(session: Session):
+async def get_stats(session: Session, current_user: CurrentUser):
     status_rows = (await session.execute(
         select(ApplicationTracking.status, func.count().label("count"))
+        .where(ApplicationTracking.user_id == current_user.id)
         .group_by(ApplicationTracking.status)
     )).all()
     counts = {r.status: r.count for r in status_rows}
 
     source_rows = (await session.execute(
         select(ApplicationTracking.source, func.count().label("count"))
+        .where(ApplicationTracking.user_id == current_user.id)
         .group_by(ApplicationTracking.source)
     )).all()
     source_counts = {r.source: r.count for r in source_rows}
@@ -38,6 +41,7 @@ async def get_stats(session: Session):
             func.count().label("count"),
         )
         .where(ApplicationTracking.created_at >= thirty_days_ago)
+        .where(ApplicationTracking.user_id == current_user.id)
         .group_by(func.date(ApplicationTracking.created_at), ApplicationTracking.status)
         .order_by(func.date(ApplicationTracking.created_at))
     )).all()
@@ -76,9 +80,12 @@ class BulkActionRequest(BaseModel):
 
 
 @router.post("/bulk")
-async def bulk_action(req: BulkActionRequest, session: Session):
+async def bulk_action(req: BulkActionRequest, session: Session, current_user: CurrentUser):
     apps = (await session.execute(
-        select(ApplicationTracking).where(ApplicationTracking.id.in_(req.ids))
+        select(ApplicationTracking).where(
+            ApplicationTracking.id.in_(req.ids),
+            ApplicationTracking.user_id == current_user.id,
+        )
     )).scalars().all()
 
     if req.action == "status_change":
@@ -100,13 +107,16 @@ async def bulk_action(req: BulkActionRequest, session: Session):
 @router.get("")
 async def list_applications(
     session: Session,
+    current_user: CurrentUser,
     status: str | None = Query(None),
     source: str | None = Query(None),
     search: str | None = Query(None),
     limit: int = Query(100, le=500),
     offset: int = Query(0),
 ):
-    stmt = select(ApplicationTracking).order_by(ApplicationTracking.created_at.desc())
+    stmt = select(ApplicationTracking).where(
+        ApplicationTracking.user_id == current_user.id
+    ).order_by(ApplicationTracking.created_at.desc())
     if status:
         stmt = stmt.where(ApplicationTracking.status == status)
     if source:
@@ -134,10 +144,13 @@ class CreateApplicationRequest(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_application(req: CreateApplicationRequest, session: Session):
+async def create_application(req: CreateApplicationRequest, session: Session, current_user: CurrentUser):
     if req.job_id is not None:
         existing = (await session.execute(
-            select(ApplicationTracking).where(ApplicationTracking.job_id == req.job_id)
+            select(ApplicationTracking).where(
+                ApplicationTracking.job_id == req.job_id,
+                ApplicationTracking.user_id == current_user.id,
+            )
         )).scalar_one_or_none()
         if existing:
             existing.status = req.status
@@ -155,6 +168,7 @@ async def create_application(req: CreateApplicationRequest, session: Session):
         status=req.status,
         source=req.source,
         score=req.score,
+        user_id=current_user.id,
     )
     session.add(app)
     await session.commit()
@@ -169,9 +183,12 @@ class UpdateApplicationRequest(BaseModel):
 
 
 @router.patch("/{app_id}")
-async def update_application(app_id: int, req: UpdateApplicationRequest, session: Session):
+async def update_application(app_id: int, req: UpdateApplicationRequest, session: Session, current_user: CurrentUser):
     app = (await session.execute(
-        select(ApplicationTracking).where(ApplicationTracking.id == app_id)
+        select(ApplicationTracking).where(
+            ApplicationTracking.id == app_id,
+            ApplicationTracking.user_id == current_user.id,
+        )
     )).scalar_one_or_none()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -187,9 +204,12 @@ async def update_application(app_id: int, req: UpdateApplicationRequest, session
 
 
 @router.delete("/{app_id}", status_code=204)
-async def delete_application(app_id: int, session: Session):
+async def delete_application(app_id: int, session: Session, current_user: CurrentUser):
     app = (await session.execute(
-        select(ApplicationTracking).where(ApplicationTracking.id == app_id)
+        select(ApplicationTracking).where(
+            ApplicationTracking.id == app_id,
+            ApplicationTracking.user_id == current_user.id,
+        )
     )).scalar_one_or_none()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")

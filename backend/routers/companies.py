@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.models.company import Company, AtsType
 from backend.scrapers.probe import probe_ats
 
@@ -34,8 +35,10 @@ class ProbeRequest(BaseModel):
 
 
 @router.get("")
-async def list_companies(session: Session):
-    rows = (await session.execute(select(Company).order_by(Company.name))).scalars().all()
+async def list_companies(session: Session, current_user: CurrentUser):
+    rows = (await session.execute(
+        select(Company).where(Company.user_id == current_user.id).order_by(Company.name)
+    )).scalars().all()
     return [
         {
             "id": c.id, "name": c.name, "careers_url": c.careers_url,
@@ -48,7 +51,7 @@ async def list_companies(session: Session):
 
 
 @router.post("/probe")
-async def probe_company(req: ProbeRequest):
+async def probe_company(req: ProbeRequest, current_user: CurrentUser):
     result = await probe_ats(req.careers_url, req.name)
     return {
         "ats_type": result.ats_type,
@@ -61,13 +64,14 @@ async def probe_company(req: ProbeRequest):
 
 
 @router.post("", status_code=201)
-async def add_company(req: CompanyCreate, session: Session):
+async def add_company(req: CompanyCreate, session: Session, current_user: CurrentUser):
     probe = await probe_ats(req.careers_url, req.name)
     company = Company(
         name=req.name,
         careers_url=req.careers_url,
         ats_type=AtsType(probe.ats_type),
         ats_identifier=probe.identifier,
+        user_id=current_user.id,
     )
     session.add(company)
     await session.commit()
@@ -78,8 +82,10 @@ async def add_company(req: CompanyCreate, session: Session):
 
 
 @router.patch("/{company_id}")
-async def update_company(company_id: int, req: CompanyUpdate, session: Session):
-    company = await session.get(Company, company_id)
+async def update_company(company_id: int, req: CompanyUpdate, session: Session, current_user: CurrentUser):
+    company = (await session.execute(
+        select(Company).where(Company.id == company_id, Company.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     for field, value in req.model_dump(exclude_none=True).items():
@@ -89,8 +95,10 @@ async def update_company(company_id: int, req: CompanyUpdate, session: Session):
 
 
 @router.delete("/{company_id}", status_code=204)
-async def delete_company(company_id: int, session: Session):
-    company = await session.get(Company, company_id)
+async def delete_company(company_id: int, session: Session, current_user: CurrentUser):
+    company = (await session.execute(
+        select(Company).where(Company.id == company_id, Company.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     await session.delete(company)
@@ -98,8 +106,10 @@ async def delete_company(company_id: int, session: Session):
 
 
 @router.post("/{company_id}/retry")
-async def retry_company(company_id: int, session: Session):
-    company = await session.get(Company, company_id)
+async def retry_company(company_id: int, session: Session, current_user: CurrentUser):
+    company = (await session.execute(
+        select(Company).where(Company.id == company_id, Company.user_id == current_user.id)
+    )).scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     company.quarantine_count = 0
@@ -111,7 +121,7 @@ async def retry_company(company_id: int, session: Session):
 
 
 @router.post("/import", status_code=201)
-async def import_companies(file: UploadFile, session: Session):
+async def import_companies(file: UploadFile, session: Session, current_user: CurrentUser):
     content = (await file.read()).decode("utf-8")
     reader = csv.DictReader(io.StringIO(content))
     created = []
@@ -124,6 +134,7 @@ async def import_companies(file: UploadFile, session: Session):
         company = Company(
             name=name, careers_url=url,
             ats_type=AtsType(probe.ats_type), ats_identifier=probe.identifier,
+            user_id=current_user.id,
         )
         session.add(company)
         created.append(name)
