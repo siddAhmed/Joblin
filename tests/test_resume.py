@@ -78,6 +78,7 @@ async def seeded_job_id(app):
             name="Stripe",
             careers_url="https://stripe.com/jobs",
             ats_type=AtsType.greenhouse,
+            user_id=1,
         )
         session.add(company)
         await session.flush()
@@ -88,6 +89,7 @@ async def seeded_job_id(app):
             url="https://stripe.com/jobs/swe-123",
             raw_description="Python, distributed systems, REST APIs, PostgreSQL",
             normalized_title="software engineer",
+            user_id=1,
         )
         session.add(job)
         await session.commit()

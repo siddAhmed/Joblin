@@ -45,7 +45,7 @@ async def test_analyze_records_skills_and_deduplicates(client: AsyncClient, app)
         await conn.run_sync(Base.metadata.create_all)
 
     async with session_factory() as session:
-        company = Company(name="Acme", careers_url="https://acme.com/careers", ats_type="greenhouse")
+        company = Company(name="Acme", careers_url="https://acme.com/careers", ats_type="greenhouse", user_id=1)
         session.add(company)
         await session.flush()
 
@@ -56,11 +56,12 @@ async def test_analyze_records_skills_and_deduplicates(client: AsyncClient, app)
             url="https://acme.com/jobs/1",
             raw_description="Python, PostgreSQL, system design required.",
             normalized_title="backend engineer",
+            user_id=1,
         )
         session.add(job)
         await session.flush()
 
-        run = Run(status=RunStatus.completed)
+        run = Run(status=RunStatus.completed, user_id=1)
         session.add(run)
         await session.flush()
 
