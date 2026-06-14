@@ -76,3 +76,28 @@ async def test_run_scrape_job_uses_provided_user_id():
     # The Run object added to session should have user_id=99
     added_run = mock_session.add.call_args[0][0]
     assert added_run.user_id == 99
+
+
+@pytest.mark.anyio
+async def test_settings_patch_syncs_scheduler_when_schedule_keys_updated(client, app):
+    """PATCH /settings with schedule keys calls sync_user_schedule."""
+    with patch("backend.routers.settings.sync_user_schedule", new_callable=AsyncMock) as mock_sync:
+        mock_scheduler = AsyncMock()
+        app.state.scheduler = mock_scheduler
+
+        response = await client.patch("/api/settings", json={"scheduler_enabled": True})
+
+    assert response.status_code == 200
+    mock_sync.assert_called_once_with(mock_scheduler, 1)
+
+
+@pytest.mark.anyio
+async def test_settings_patch_does_not_sync_for_non_schedule_keys(client, app):
+    """PATCH /settings with non-schedule keys does not call sync_user_schedule."""
+    with patch("backend.routers.settings.sync_user_schedule", new_callable=AsyncMock) as mock_sync:
+        app.state.scheduler = AsyncMock()
+
+        response = await client.patch("/api/settings", json={"discord_webhook_url": "https://example.com"})
+
+    assert response.status_code == 200
+    mock_sync.assert_not_called()
