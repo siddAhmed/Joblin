@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
         await seed_defaults(session, user_id=1)
 
     async with AsyncScheduler() as scheduler:
+        app.state.scheduler = scheduler
         await start_scheduler(scheduler)
         await scheduler.start_in_background()
         yield
