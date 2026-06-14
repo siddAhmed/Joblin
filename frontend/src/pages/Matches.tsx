@@ -5,8 +5,77 @@ import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
 import { jobsApi } from "@/api/jobs";
 import { formatScore } from "@/lib/utils";
+import { applicationsApi, ApplicationTracking, ApplicationStatus } from "../api/applications";
 
-function MatchRow({ match, selected, onSelect }: { match: Match; selected: boolean; onSelect: () => void }) {
+function TrackButtons({
+  match,
+  trackerMap,
+}: {
+  match: Match;
+  trackerMap: Map<number, ApplicationTracking>;
+}) {
+  const qc = useQueryClient();
+  const tracked = trackerMap.get(match.job_id);
+
+  const track = useMutation({
+    mutationFn: (status: ApplicationStatus) =>
+      applicationsApi.create({
+        job_id: match.job_id,
+        company_name: match.company_name,
+        job_title: match.job_title,
+        url: match.job_url ?? undefined,
+        status,
+        source: "joblin",
+        score: match.score,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["applications"] }),
+  });
+
+  const isInterested = tracked?.status === "interested";
+  const isApplied =
+    tracked?.status === "applied" ||
+    tracked?.status === "rejected" ||
+    tracked?.status === "offer";
+
+  return (
+    <>
+      <button
+        className={`text-xs px-3 py-1.5 border rounded-md transition-colors ${
+          isInterested
+            ? "bg-purple-900/40 border-purple-800/60 text-purple-400"
+            : "border-[#1e1e1e] text-[#666] hover:text-purple-400 hover:border-purple-900/60"
+        }`}
+        onClick={() => track.mutate("interested")}
+        disabled={track.isPending}
+      >
+        ★ Interested
+      </button>
+      <button
+        className={`text-xs px-3 py-1.5 border rounded-md transition-colors ${
+          isApplied
+            ? "bg-blue-900/40 border-blue-800/60 text-blue-400"
+            : "border-[#1e1e1e] text-[#666] hover:text-blue-400 hover:border-blue-900/60"
+        }`}
+        onClick={() => track.mutate("applied")}
+        disabled={track.isPending}
+      >
+        ✓ Applied
+      </button>
+    </>
+  );
+}
+
+function MatchRow({
+  match,
+  selected,
+  onSelect,
+  trackerMap,
+}: {
+  match: Match;
+  selected: boolean;
+  onSelect: () => void;
+  trackerMap: Map<number, ApplicationTracking>;
+}) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const { data: job } = useQuery({ queryKey: ["job", match.job_id], queryFn: () => jobsApi.get(match.job_id), enabled: expanded });
@@ -43,7 +112,17 @@ function MatchRow({ match, selected, onSelect }: { match: Match; selected: boole
           )}
           <div className="flex gap-2 mt-3">
             <button onClick={() => dismiss.mutate()} className="text-[11px] border border-[#2a2a2a] rounded px-2 py-1 text-[#888] hover:text-[#ccc]">Not interested</button>
-            {applyUrl && <a href={applyUrl} target="_blank" rel="noreferrer" className="text-[11px] border border-[#4e9eff] rounded px-2 py-1 text-[#4e9eff] hover:bg-[#0e2040]">Apply</a>}
+            {applyUrl && (
+              <a
+                href={applyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs px-3 py-1.5 border border-[#1e1e1e] rounded-md text-[#4e9eff] hover:border-[#333]"
+              >
+                ↗ View JD
+              </a>
+            )}
+            <TrackButtons match={match} trackerMap={trackerMap} />
             <button
               onClick={() => navigate(`/resume?jobId=${match.job_id}`)}
               className="text-[11px] border border-[#4e4e9f] rounded px-2 py-1 text-[#a78bfa] hover:bg-[#1a1a3a]"
@@ -63,6 +142,15 @@ export function Matches() {
   const [tier, setTier] = useState("");
   const qc = useQueryClient();
   const { data: matches = [], isLoading } = useQuery({ queryKey: ["matches", tier], queryFn: () => matchesApi.list({ tier: tier || undefined }) });
+  const { data: trackedApps = [] } = useQuery({
+    queryKey: ["applications"],
+    queryFn: () => applicationsApi.list(),
+  });
+  const trackerMap = new Map<number, ApplicationTracking>(
+    trackedApps
+      .filter((a): a is ApplicationTracking & { job_id: number } => a.job_id != null)
+      .map((a) => [a.job_id, a])
+  );
   const bulkNotify = useMutation({ mutationFn: () => matchesApi.notify(Array.from(selected)), onSuccess: () => { setSelected(new Set()); qc.invalidateQueries({ queryKey: ["matches"] }); } });
   const toggle = (id: number) => setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
@@ -76,6 +164,48 @@ export function Matches() {
         </select>
         {selected.size > 0 && (
           <>
+            <button
+              className="text-xs px-3 py-1 border border-[#1e1e1e] rounded text-[#666] hover:text-purple-400 hover:border-purple-900/60"
+              onClick={() => {
+                const toTrack = matches.filter((m) => selected.has(m.id));
+                Promise.all(
+                  toTrack.map((m) =>
+                    applicationsApi.create({
+                      job_id: m.job_id,
+                      company_name: m.company_name,
+                      job_title: m.job_title,
+                      url: m.job_url ?? undefined,
+                      status: "interested",
+                      source: "joblin",
+                      score: m.score,
+                    })
+                  )
+                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] }));
+              }}
+            >
+              ★ Mark Interested
+            </button>
+            <button
+              className="text-xs px-3 py-1 border border-[#1e1e1e] rounded text-[#666] hover:text-blue-400 hover:border-blue-900/60"
+              onClick={() => {
+                const toTrack = matches.filter((m) => selected.has(m.id));
+                Promise.all(
+                  toTrack.map((m) =>
+                    applicationsApi.create({
+                      job_id: m.job_id,
+                      company_name: m.company_name,
+                      job_title: m.job_title,
+                      url: m.job_url ?? undefined,
+                      status: "applied",
+                      source: "joblin",
+                      score: m.score,
+                    })
+                  )
+                ).then(() => qc.invalidateQueries({ queryKey: ["applications"] }));
+              }}
+            >
+              ✓ Mark Applied
+            </button>
             <button onClick={() => bulkNotify.mutate()} className="text-xs border border-[#4e9eff] rounded px-3 py-1 text-[#4e9eff] bg-[#0e2040]">
               Re-notify {selected.size} selected
             </button>
@@ -89,7 +219,7 @@ export function Matches() {
         )}
       </div>
       {isLoading && <p className="text-[#555] text-sm">Loading...</p>}
-      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} />)}
+      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} trackerMap={trackerMap} />)}
     </div>
   );
 }
