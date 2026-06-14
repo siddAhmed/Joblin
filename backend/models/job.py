@@ -21,3 +21,4 @@ class Job(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)

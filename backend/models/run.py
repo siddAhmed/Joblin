@@ -33,6 +33,7 @@ class Run(Base):
     total_confirmed: Mapped[int] = mapped_column(Integer, default=0)
     total_notified: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
 
 
 class RunCompanyResult(Base):
