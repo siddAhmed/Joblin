@@ -6,6 +6,7 @@ from backend.models.setting import Setting
 from backend.models.feedback import FeedbackExample
 from backend.models.token_usage import TokenUsage
 from backend.models.job_skill import JobSkill
+from backend.models.application import ApplicationTracking, ApplicationStatus, ApplicationSource
 
 __all__ = [
     "Company", "AtsType",
@@ -16,4 +17,5 @@ __all__ = [
     "FeedbackExample",
     "TokenUsage",
     "JobSkill",
+    "ApplicationTracking", "ApplicationStatus", "ApplicationSource",
 ]
