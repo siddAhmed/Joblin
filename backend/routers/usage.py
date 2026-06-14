@@ -6,6 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
+from backend.models.run import Run
 from backend.models.token_usage import TokenUsage
 
 router = APIRouter(prefix="/usage", tags=["usage"])
@@ -14,14 +16,18 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 PROVIDERS = ["groq", "cerebras", "gemini"]
 
 
-async def _aggregate(session: AsyncSession, provider: str, since: datetime | None) -> dict:
-    stmt = select(
-        func.coalesce(func.sum(TokenUsage.total_tokens), 0),
-        func.coalesce(func.sum(TokenUsage.prompt_tokens), 0),
-        func.coalesce(func.sum(TokenUsage.completion_tokens), 0),
-        func.count(TokenUsage.id).filter(TokenUsage.call_type == "filter"),
-        func.count(TokenUsage.id).filter(TokenUsage.call_type == "summarize"),
-    ).where(TokenUsage.provider == provider)
+async def _aggregate(session: AsyncSession, provider: str, since: datetime | None, user_id: int) -> dict:
+    stmt = (
+        select(
+            func.coalesce(func.sum(TokenUsage.total_tokens), 0),
+            func.coalesce(func.sum(TokenUsage.prompt_tokens), 0),
+            func.coalesce(func.sum(TokenUsage.completion_tokens), 0),
+            func.count(TokenUsage.id).filter(TokenUsage.call_type == "filter"),
+            func.count(TokenUsage.id).filter(TokenUsage.call_type == "summarize"),
+        )
+        .join(Run, TokenUsage.run_id == Run.id)
+        .where(TokenUsage.provider == provider, Run.user_id == user_id)
+    )
     if since:
         stmt = stmt.where(TokenUsage.created_at >= since)
     row = (await session.execute(stmt)).one()
@@ -35,16 +41,16 @@ async def _aggregate(session: AsyncSession, provider: str, since: datetime | Non
 
 
 @router.get("")
-async def get_usage(session: Session):
+async def get_usage(session: Session, current_user: CurrentUser):
     now = datetime.now(timezone.utc)
     cutoff_7d = now - timedelta(days=7)
     cutoff_30d = now - timedelta(days=30)
 
     providers = {}
     for provider in PROVIDERS:
-        all_time = await _aggregate(session, provider, since=None)
-        last_7d = await _aggregate(session, provider, since=cutoff_7d)
-        last_30d = await _aggregate(session, provider, since=cutoff_30d)
+        all_time = await _aggregate(session, provider, since=None, user_id=current_user.id)
+        last_7d = await _aggregate(session, provider, since=cutoff_7d, user_id=current_user.id)
+        last_30d = await _aggregate(session, provider, since=cutoff_30d, user_id=current_user.id)
         providers[provider] = {
             "total_tokens_all_time": all_time["total_tokens"],
             "prompt_tokens_all_time": all_time["prompt_tokens"],
@@ -61,6 +67,8 @@ async def get_usage(session: Session):
             TokenUsage.provider,
             func.sum(TokenUsage.total_tokens).label("tokens"),
         )
+        .join(Run, TokenUsage.run_id == Run.id)
+        .where(Run.user_id == current_user.id)
         .group_by(TokenUsage.run_id, TokenUsage.provider)
         .order_by(TokenUsage.run_id.desc())
         .limit(50)

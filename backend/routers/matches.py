@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_all_settings
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.discord import post_match_to_discord
 from backend.models.match import Match
 from backend.models.job import Job
@@ -20,6 +21,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 @router.get("")
 async def list_matches(
     session: Session,
+    current_user: CurrentUser,
     tier: str | None = Query(None),
     company_id: int | None = Query(None),
     limit: int = Query(50, le=200),
@@ -29,10 +31,13 @@ async def list_matches(
         select(Match, Job, Company)
         .join(Job, Match.job_id == Job.id)
         .join(Company, Job.company_id == Company.id)
+        .where(Company.user_id == current_user.id)
         .order_by(Match.created_at.desc())
     )
     if tier:
         stmt = stmt.where(Match.tier == tier)
+    if company_id:
+        stmt = stmt.where(Company.id == company_id)
     stmt = stmt.offset(offset).limit(limit)
     rows = (await session.execute(stmt)).all()
     return [
@@ -55,8 +60,8 @@ class BulkNotifyRequest(BaseModel):
 
 
 @router.post("/notify")
-async def bulk_notify(req: BulkNotifyRequest, session: Session):
-    settings = await get_all_settings(session)
+async def bulk_notify(req: BulkNotifyRequest, session: Session, current_user: CurrentUser):
+    settings = await get_all_settings(session, user_id=current_user.id)
     webhook_url = settings.get("discord_webhook_url", "")
     notified = 0
 
@@ -65,8 +70,10 @@ async def bulk_notify(req: BulkNotifyRequest, session: Session):
         if not match or match.is_preview:
             continue
         job = await session.get(Job, match.job_id)
+        if not job or job.user_id != current_user.id:
+            continue
         company = await session.get(Company, job.company_id) if job else None
-        if not job or not company:
+        if not company:
             continue
         try:
             await post_match_to_discord(

@@ -34,3 +34,4 @@ class ApplicationTracking(Base):
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)

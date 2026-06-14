@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_all_settings
 from backend.database import get_session
+from backend.dependencies.auth import CurrentUser
 from backend.llm.factory import get_filter_provider
 from backend.models.company import Company
 from backend.models.job import Job
@@ -23,8 +24,8 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/analyze")
-async def analyze_skills(req: AnalyzeRequest, session: Session):
-    settings = await get_all_settings(session)
+async def analyze_skills(req: AnalyzeRequest, session: Session, current_user: CurrentUser):
+    settings = await get_all_settings(session, user_id=current_user.id)
     provider = get_filter_provider(settings)
 
     analyzed = 0
@@ -37,7 +38,7 @@ async def analyze_skills(req: AnalyzeRequest, session: Session):
             continue
 
         job = await session.get(Job, match.job_id)
-        if not job:
+        if not job or job.user_id != current_user.id:
             continue
 
         existing = (await session.execute(
@@ -68,15 +69,19 @@ async def analyze_skills(req: AnalyzeRequest, session: Session):
 
 
 @router.get("/skills")
-async def list_skills(session: Session):
+async def list_skills(session: Session, current_user: CurrentUser):
     rows = (await session.execute(
         select(JobSkill.skill_name, func.count(JobSkill.id).label("count"))
+        .join(Job, JobSkill.job_id == Job.id)
+        .where(Job.user_id == current_user.id)
         .group_by(JobSkill.skill_name)
         .order_by(func.count(JobSkill.id).desc())
     )).all()
 
     total_jobs = (await session.execute(
         select(func.count(func.distinct(JobSkill.job_id)))
+        .join(Job, JobSkill.job_id == Job.id)
+        .where(Job.user_id == current_user.id)
     )).scalar() or 0
 
     return {
@@ -86,13 +91,13 @@ async def list_skills(session: Session):
 
 
 @router.get("/skills/{name}/citations")
-async def get_citations(name: str, session: Session):
+async def get_citations(name: str, session: Session, current_user: CurrentUser):
     rows = (await session.execute(
         select(Company.name.label("company_name"), Job.title.label("job_title"))
         .select_from(JobSkill)
         .join(Job, JobSkill.job_id == Job.id)
         .join(Company, Job.company_id == Company.id)
-        .where(JobSkill.skill_name == name)
+        .where(JobSkill.skill_name == name, Company.user_id == current_user.id)
         .order_by(JobSkill.created_at.desc())
     )).all()
     return [{"company_name": row.company_name, "job_title": row.job_title} for row in rows]

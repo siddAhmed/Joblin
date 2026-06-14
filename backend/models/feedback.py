@@ -14,3 +14,4 @@ class FeedbackExample(Base):
     normalized_location: Mapped[str | None] = mapped_column(String, nullable=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     dismissed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)

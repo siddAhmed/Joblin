@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     from backend.scheduler import start_scheduler
 
     async with AsyncSessionLocal() as session:
-        await seed_defaults(session)
+        await seed_defaults(session, user_id=1)
 
     async with AsyncScheduler() as scheduler:
         await start_scheduler(scheduler)
