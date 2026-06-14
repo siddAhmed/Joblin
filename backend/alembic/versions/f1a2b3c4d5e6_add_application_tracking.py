@@ -8,6 +8,7 @@ Create Date: 2026-06-14
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision: str = "f1a2b3c4d5e6"
 down_revision: Union[str, None] = "a1b2c3d4e5f6"
@@ -16,6 +17,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    # Table may already exist if create_all ran before migrations (e.g. first boot).
+    if inspect(bind).has_table("application_tracking"):
+        return
+
     op.create_table(
         "application_tracking",
         sa.Column("id", sa.Integer(), primary_key=True),
