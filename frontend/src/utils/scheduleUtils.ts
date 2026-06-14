@@ -47,7 +47,7 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 function parseTime(time: string): { hour: number; min: number } {
   const [h, m] = time.split(":").map(Number);
-  return { hour: h, min: m };
+  return { hour: isNaN(h) ? 0 : h, min: isNaN(m) ? 0 : m };
 }
 
 export function presetToCron(state: ScheduleState): string {
@@ -78,24 +78,28 @@ export function describeSchedule(state: ScheduleState): string {
   const { hour, min } = parseTime(state.time);
   const minPad = String(min).padStart(2, "0");
 
+  const hourPad = String(hour).padStart(2, "0");
+  const timeFmt = `${hourPad}:${minPad}`;
+  const dayName = DAY_NAMES[Math.max(0, Math.min(6, state.dayOfWeek))];
+
   switch (state.preset) {
     case "twice_daily": {
       const hour2 = (hour + 12) % 24;
       const h2Pad = String(hour2).padStart(2, "0");
-      return `Runs twice per day at ${state.time} and ${h2Pad}:${minPad} ${tzLabel}.`;
+      return `Runs twice per day at ${timeFmt} and ${h2Pad}:${minPad} ${tzLabel}.`;
     }
     case "daily":
-      return `Runs once per day at ${state.time} ${tzLabel}.`;
+      return `Runs once per day at ${timeFmt} ${tzLabel}.`;
     case "every_2_days":
-      return `Runs every 2 days at ${state.time} ${tzLabel}.`;
+      return `Runs every 2 days at ${timeFmt} ${tzLabel}.`;
     case "every_3_days":
-      return `Runs every 3 days at ${state.time} ${tzLabel}.`;
+      return `Runs every 3 days at ${timeFmt} ${tzLabel}.`;
     case "weekly":
-      return `Runs every ${DAY_NAMES[state.dayOfWeek]} at ${state.time} ${tzLabel}.`;
+      return `Runs every ${dayName} at ${timeFmt} ${tzLabel}.`;
     case "custom":
       if (state.customMode === "cron") return `Custom schedule: ${state.cronExpression}`;
       if (state.intervalUnit === "hours") return `Runs every ${state.intervalValue} hour(s).`;
-      return `Runs every ${state.intervalValue} day(s) at ${state.time} ${tzLabel}.`;
+      return `Runs every ${state.intervalValue} day(s) at ${timeFmt} ${tzLabel}.`;
   }
 }
 
