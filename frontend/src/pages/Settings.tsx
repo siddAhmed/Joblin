@@ -2,8 +2,200 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsApi } from "@/api/settings";
 import { api } from "@/api/client";
+import {
+  type ScheduleState,
+  PRESETS,
+  TIMEZONES,
+  DAY_LABELS,
+  describeSchedule,
+  stateFromSettings,
+  stateToSettingsPayload,
+} from "@/utils/scheduleUtils";
 
 type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets" | "danger";
+
+function ScheduleTab({
+  settings,
+  onSave,
+}: {
+  settings: Record<string, unknown>;
+  onSave: (data: Record<string, unknown>) => void;
+}) {
+  const [state, setState] = useState<ScheduleState>(() => stateFromSettings(settings));
+
+  function save(next: ScheduleState) {
+    onSave(stateToSettingsPayload(next));
+  }
+
+  function update(partial: Partial<ScheduleState>, saveNow = true) {
+    const next = { ...state, ...partial };
+    setState(next);
+    if (saveNow) save(next);
+  }
+
+  const showTime =
+    state.preset !== "custom" || (state.preset === "custom" && state.customMode === "interval" && state.intervalUnit === "days");
+  const showTimezone = showTime;
+  const showDayPicker = state.preset === "weekly";
+
+  return (
+    <div className="space-y-4 max-w-sm">
+      {/* Preset chips */}
+      <div>
+        <div className="text-xs text-[#666] uppercase tracking-wider mb-2">Run frequency</div>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => update({ preset: p.value })}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                state.preset === p.value
+                  ? "border-[#4e9eff] text-[#4e9eff] bg-[#0e2040]"
+                  : "border-[#2a2a2a] text-[#666] hover:border-[#444] hover:text-[#888]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Contextual panel */}
+      <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-lg p-3 space-y-3">
+        {/* Weekly: day picker */}
+        {showDayPicker && (
+          <div>
+            <div className="text-xs text-[#666] mb-1.5">Day</div>
+            <div className="flex gap-1.5">
+              {DAY_LABELS.map((label, i) => (
+                <button
+                  key={i}
+                  onClick={() => update({ dayOfWeek: i })}
+                  className={`w-7 h-7 rounded-full text-xs font-medium border transition-colors ${
+                    state.dayOfWeek === i
+                      ? "border-[#4e9eff] text-[#4e9eff] bg-[#0e2040]"
+                      : "border-[#2a2a2a] text-[#555] hover:border-[#444]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Custom: interval builder or cron input */}
+        {state.preset === "custom" && (
+          <div>
+            {state.customMode === "interval" ? (
+              <div>
+                <div className="text-xs text-[#666] mb-1.5">Every</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={state.intervalValue}
+                    onChange={(e) => setState((s) => ({ ...s, intervalValue: parseInt(e.target.value) || 1 }))}
+                    onBlur={() => save(state)}
+                    className="w-14 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
+                  />
+                  <select
+                    value={state.intervalUnit}
+                    onChange={(e) => update({ intervalUnit: e.target.value as "hours" | "days" })}
+                    className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]"
+                  >
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => update({ customMode: "cron" })}
+                  className="text-xs text-[#4e4e88] underline mt-2"
+                >
+                  Switch to cron expression →
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="text-xs text-[#666] mb-1.5">Cron expression</div>
+                <input
+                  type="text"
+                  defaultValue={state.cronExpression}
+                  onBlur={(e) => update({ cronExpression: e.target.value })}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm text-[#e5e5e5] font-mono"
+                  placeholder="0 */4 * * *"
+                />
+                <button
+                  onClick={() => update({ customMode: "interval" })}
+                  className="text-xs text-[#4e4e88] underline mt-2"
+                >
+                  ← Back to interval builder
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Time + timezone row */}
+        {showTime && (
+          <div className="flex gap-3 items-end">
+            <div>
+              <div className="text-xs text-[#666] mb-1.5">Run at</div>
+              <input
+                type="time"
+                value={state.time}
+                onChange={(e) => setState((s) => ({ ...s, time: e.target.value }))}
+                onBlur={() => save(state)}
+                className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] font-mono"
+              />
+            </div>
+            {showTimezone && (
+              <div>
+                <div className="text-xs text-[#666] mb-1.5">Timezone</div>
+                <select
+                  value={state.timezone}
+                  onChange={(e) => update({ timezone: e.target.value })}
+                  className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs text-[#e5e5e5]"
+                >
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz.iana} value={tz.iana}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Plain-English description */}
+        <div className="text-xs text-[#555]">{describeSchedule(state)}</div>
+      </div>
+
+      {/* Staleness threshold */}
+      <div>
+        <div className="text-xs text-[#666] mb-1.5">Skip if last run was within</div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            defaultValue={(settings.staleness_threshold_hours as number) ?? 4}
+            onBlur={(e) => onSave({ staleness_threshold_hours: parseFloat(e.target.value) })}
+            className="w-16 bg-[#111] border border-[#2a2a2a] rounded px-2 py-1.5 text-sm text-[#e5e5e5] text-center"
+          />
+          <span className="text-xs text-[#666]">hours</span>
+        </div>
+      </div>
+
+      {/* Enable toggle */}
+      <label className="flex items-center gap-2 text-xs text-[#888] cursor-pointer">
+        <input
+          type="checkbox"
+          defaultChecked={!!(settings.scheduler_enabled)}
+          onChange={(e) => onSave({ scheduler_enabled: e.target.checked })}
+        />
+        Scheduler enabled
+      </label>
+    </div>
+  );
+}
 
 export function Settings() {
   const [tab, setTab] = useState<Tab>("discord");
@@ -120,20 +312,10 @@ export function Settings() {
       )}
 
       {tab === "schedule" && (
-        <div className="space-y-3 max-w-sm">
-          <label className="block text-xs text-[#888]">Cron expression</label>
-          <input defaultValue={(s.schedule_cron as string) || "0 */4 * * *"}
-            onBlur={(e) => update.mutate({ schedule_cron: e.target.value })}
-            className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5] font-mono" />
-          <label className="block text-xs text-[#888]">Staleness threshold (hours)</label>
-          <input type="number" defaultValue={(s.staleness_threshold_hours as number) ?? 4}
-            onBlur={(e) => update.mutate({ staleness_threshold_hours: parseFloat(e.target.value) })}
-            className="w-32 bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5]" />
-          <label className="flex items-center gap-2 text-xs text-[#888] cursor-pointer">
-            <input type="checkbox" defaultChecked={!!s.scheduler_enabled} onChange={(e) => update.mutate({ scheduler_enabled: e.target.checked })} />
-            Enable scheduler
-          </label>
-        </div>
+        <ScheduleTab
+          settings={s}
+          onSave={(data) => update.mutate(data)}
+        />
       )}
 
       {tab === "llm" && (
