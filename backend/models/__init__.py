@@ -7,6 +7,7 @@ from backend.models.feedback import FeedbackExample
 from backend.models.token_usage import TokenUsage
 from backend.models.job_skill import JobSkill
 from backend.models.application import ApplicationTracking, ApplicationStatus, ApplicationSource
+from backend.models.user import User
 
 __all__ = [
     "Company", "AtsType",
@@ -18,4 +19,5 @@ __all__ = [
     "TokenUsage",
     "JobSkill",
     "ApplicationTracking", "ApplicationStatus", "ApplicationSource",
+    "User",
 ]
