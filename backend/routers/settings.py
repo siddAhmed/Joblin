@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,8 @@ from backend.discord import post_match_to_discord
 router = APIRouter(prefix="/settings", tags=["settings"])
 Session = Annotated[AsyncSession, Depends(get_session)]
 
+SCHEDULE_KEYS = {"schedule_cron", "scheduler_enabled", "schedule_timezone"}
+
 
 @router.get("")
 async def get_settings(session: Session, current_user: CurrentUser):
@@ -19,9 +21,15 @@ async def get_settings(session: Session, current_user: CurrentUser):
 
 
 @router.patch("")
-async def update_settings(body: dict, session: Session, current_user: CurrentUser):
+async def update_settings(request: Request, body: dict, session: Session, current_user: CurrentUser):
     for key, value in body.items():
         await set_setting(session, key, value, user_id=current_user.id)
+
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is not None and SCHEDULE_KEYS & set(body.keys()):
+        from backend.scheduler import sync_user_schedule
+        await sync_user_schedule(scheduler, current_user.id)
+
     return {"updated": list(body.keys())}
 
 

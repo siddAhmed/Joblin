@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 
 async def test_start_run_returns_run_id(client):
-    with patch("backend.pipeline.execute_run", new_callable=AsyncMock):
+    with patch("backend.routers.runs.execute_run", new_callable=AsyncMock):
         response = await client.post("/api/runs", json={})
     assert response.status_code == 201
     data = response.json()
