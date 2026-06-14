@@ -88,7 +88,13 @@ async def cancel_run(run_id: int, session: Session, current_user: CurrentUser):
 
 
 @router.get("/{run_id}/stream")
-async def stream_run(run_id: int, current_user: CurrentUser):
+async def stream_run(run_id: int, session: Session, current_user: CurrentUser):
+    run = (await session.execute(
+        select(Run).where(Run.id == run_id, Run.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
     async def generator():
         q = get_run_queue(run_id)
         while True:
