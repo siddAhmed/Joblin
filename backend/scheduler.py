@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
-from apscheduler import AsyncScheduler, ConflictPolicy
+from apscheduler import AsyncScheduler, ConflictPolicy, ScheduleLookupError
 from apscheduler.triggers.cron import CronTrigger
 
 from backend.database import AsyncSessionLocal
@@ -45,7 +45,7 @@ async def _schedule_user_job(scheduler: AsyncScheduler, user_id: int) -> None:
     if not enabled:
         try:
             await scheduler.remove_schedule(job_id)
-        except Exception:
+        except ScheduleLookupError:
             pass
         return
 

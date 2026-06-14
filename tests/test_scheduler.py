@@ -1,34 +1,8 @@
 """Tests for backend/scheduler.py per-user job scheduling."""
-import sys
-from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-
-def _mock_apscheduler():
-    """Inject a minimal apscheduler mock into sys.modules so backend.scheduler can be imported."""
-    if "apscheduler" in sys.modules:
-        return
-
-    apscheduler = ModuleType("apscheduler")
-    apscheduler.AsyncScheduler = MagicMock
-    apscheduler.ConflictPolicy = MagicMock()
-    apscheduler.ConflictPolicy.replace = "replace"
-
-    triggers = ModuleType("apscheduler.triggers")
-    triggers_cron = ModuleType("apscheduler.triggers.cron")
-    triggers_cron.CronTrigger = MagicMock
-
-    sys.modules["apscheduler"] = apscheduler
-    sys.modules["apscheduler.triggers"] = triggers
-    sys.modules["apscheduler.triggers.cron"] = triggers_cron
-
-
-# Install the mock before any test imports backend.scheduler
-_mock_apscheduler()
-
-# Force-import backend.scheduler now so patch() can resolve "backend.scheduler.*"
-import backend.scheduler  # noqa: E402
+import backend.scheduler  # noqa: E402 — pre-import so patch() can resolve backend.scheduler.*
 
 
 @pytest.mark.anyio
