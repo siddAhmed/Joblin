@@ -1,5 +1,5 @@
 from typing import Annotated
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
@@ -30,7 +30,7 @@ async def get_stats(session: Session):
     applied = counts.get(ApplicationStatus.applied, 0)
     offer = counts.get(ApplicationStatus.offer, 0)
 
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     daily_rows = (await session.execute(
         select(
             func.date(ApplicationTracking.created_at).label("day"),
