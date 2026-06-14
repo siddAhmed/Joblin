@@ -30,6 +30,8 @@ async def get_current_user(
             session.add(user)
             await session.commit()
             await session.refresh(user)
+            from backend.config import seed_defaults
+            await seed_defaults(session, user_id=user.id)
         except IntegrityError:
             await session.rollback()
             user = (await session.execute(
