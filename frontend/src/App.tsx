@@ -13,6 +13,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { Usage } from "./pages/Usage";
 import { Insights } from "./pages/Insights";
 import { Resume } from "./pages/Resume";
+import { Applications } from "./pages/Applications";
 
 function AppInner() {
   const { data, isLoading, refetch } = useQuery({
@@ -28,6 +29,7 @@ function AppInner() {
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/matches" element={<Matches />} />
+        <Route path="/applications" element={<Applications />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/companies" element={<Companies />} />
         <Route path="/runs" element={<Runs />} />

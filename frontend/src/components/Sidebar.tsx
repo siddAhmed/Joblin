@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { label: "Dashboard", icon: "◼", path: "/" },
   { label: "Matches", icon: "★", path: "/matches" },
+  { label: "Applications", icon: "⊙", path: "/applications" },
   { label: "All Jobs", icon: "≡", path: "/jobs" },
   { label: "Companies", icon: "⊞", path: "/companies", warn: true },
   { label: "Runs", icon: "▶", path: "/runs" },
