@@ -1,6 +1,12 @@
 :80 {
-    basic_auth /* {
-        joblin {$CADDY_HASHED_PASSWORD}
+    forward_auth host.docker.internal:9000 {
+        uri /outpost.goauthentik.io/auth/caddy
+        copy_headers X-authentik-username X-authentik-email X-authentik-name
+
+        @goauthentik_proxy_response header X-Goauthentik-Auth-Redirect .
+        handle_response @goauthentik_proxy_response {
+            redir * {http.reverse_proxy.header.Location} 302
+        }
     }
     reverse_proxy app:8000
 }
