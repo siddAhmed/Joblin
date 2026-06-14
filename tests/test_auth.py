@@ -1,3 +1,10 @@
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from backend.database import Base, get_session
+from backend.main import create_app
+
+
 def test_user_model_columns():
     from backend.models.user import User
     assert User.__tablename__ == "users"
@@ -24,13 +31,6 @@ def test_owned_models_have_user_id():
     from backend.models.resume import Resume
     for model in [Company, Job, Run, ApplicationTracking, FeedbackExample, Resume]:
         assert hasattr(model, "user_id"), f"{model.__name__} missing user_id"
-
-
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from backend.database import Base, get_session
-from backend.main import create_app
 
 
 @pytest.mark.anyio
