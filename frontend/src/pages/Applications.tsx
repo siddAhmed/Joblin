@@ -152,6 +152,86 @@ function StatusDropdown({ app }: { app: ApplicationTracking }) {
   );
 }
 
+// ── edit application modal ────────────────────────────────────────────────────
+
+function EditApplicationModal({ app, onClose }: { app: ApplicationTracking; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    status: app.status,
+    applied_date: app.applied_date ?? "",
+    notes: app.notes ?? "",
+  });
+  const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  const update = useMutation({
+    mutationFn: () => applicationsApi.update(app.id, {
+      status: form.status,
+      applied_date: form.applied_date || undefined,
+      notes: form.notes || undefined,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["applications"] }); onClose(); },
+  });
+
+  const showDate = ["applied", "rejected", "offer"].includes(form.status);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-[#111] border border-[#1e1e1e] rounded-xl w-full max-w-md p-6">
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-[#e5e5e5]">{app.company_name}</h2>
+          <p className="text-xs text-[#555] mt-0.5">{app.job_title}</p>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] text-[#555] uppercase tracking-wider mb-1">Status</label>
+            <select
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] outline-none"
+              value={form.status}
+              onChange={(e) => set("status", e.target.value)}
+            >
+              <option value="interested">Interested</option>
+              <option value="applied">Applied</option>
+              <option value="rejected">Rejected</option>
+              <option value="offer">Offer</option>
+            </select>
+          </div>
+          {showDate && (
+            <div>
+              <label className="block text-[10px] text-[#555] uppercase tracking-wider mb-1">Date Applied</label>
+              <input
+                type="date"
+                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] outline-none focus:border-[#4e9eff]"
+                value={form.applied_date}
+                onChange={(e) => set("applied_date", e.target.value)}
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] text-[#555] uppercase tracking-wider mb-1">Notes</label>
+            <textarea
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] outline-none focus:border-[#4e9eff] resize-none"
+              rows={4}
+              placeholder="Add notes..."
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button className="px-4 py-2 text-xs text-[#666] hover:text-[#999] border border-[#1e1e1e] rounded-md" onClick={onClose}>Cancel</button>
+          <button
+            className="px-4 py-2 text-xs bg-[#1d4ed8] hover:bg-blue-600 text-white rounded-md disabled:opacity-50"
+            disabled={update.isPending}
+            onClick={() => update.mutate()}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── add external job modal ────────────────────────────────────────────────────
 
 function AddExternalJobModal({ onClose }: { onClose: () => void }) {
@@ -259,6 +339,7 @@ export function Applications() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showModal, setShowModal] = useState(false);
+  const [editingApp, setEditingApp] = useState<ApplicationTracking | null>(null);
 
   useEffect(() => {
     setSelected(new Set());
@@ -420,6 +501,10 @@ export function Applications() {
                       <a href={app.url} target="_blank" rel="noreferrer" className="text-[10px] px-2 py-1 border border-[#1e1e1e] rounded text-[#555] hover:text-[#4e9eff] hover:border-[#333]">↗</a>
                     )}
                     <button
+                      className="text-[10px] px-2 py-1 border border-[#1e1e1e] rounded text-[#555] hover:text-[#e5e5e5] hover:border-[#333]"
+                      onClick={() => setEditingApp(app)}
+                    >Edit</button>
+                    <button
                       className="text-[10px] px-2 py-1 border border-red-900/30 text-red-500/40 hover:text-red-400 rounded"
                       onClick={() => { if (confirm("Remove this application?")) deleteSingle.mutate(app.id); }}
                     >✕</button>
@@ -432,6 +517,7 @@ export function Applications() {
       </div>
 
       {showModal && <AddExternalJobModal onClose={() => setShowModal(false)} />}
+      {editingApp && <EditApplicationModal app={editingApp} onClose={() => setEditingApp(null)} />}
     </div>
   );
 }
