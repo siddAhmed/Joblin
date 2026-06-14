@@ -77,8 +77,8 @@ function StatsSection() {
               const i = d.interested ?? 0;
               return (
                 <div key={d.date} className="flex-1 flex flex-col justify-end h-full gap-px" title={`${d.date}: ${a} applied, ${i} interested`}>
-                  {a > 0 && <div className="w-full rounded-sm bg-blue-500/60" style={{ height: `${Math.round((a / maxVal) * 100)}%` }} />}
                   {i > 0 && <div className="w-full rounded-sm bg-purple-500/60" style={{ height: `${Math.round((i / maxVal) * 100)}%` }} />}
+                  {a > 0 && <div className="w-full rounded-sm bg-blue-500/60" style={{ height: `${Math.round((a / maxVal) * 100)}%` }} />}
                 </div>
               );
             })}
@@ -420,7 +420,7 @@ export function Applications() {
                     )}
                     <button
                       className="text-[10px] px-2 py-1 border border-red-900/30 text-red-500/40 hover:text-red-400 rounded"
-                      onClick={() => deleteSingle.mutate(app.id)}
+                      onClick={() => { if (confirm("Remove this application?")) deleteSingle.mutate(app.id); }}
                     >✕</button>
                   </div>
                 </td>
