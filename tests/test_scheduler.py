@@ -1,4 +1,5 @@
 """Tests for backend/scheduler.py per-user job scheduling."""
+from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -76,6 +77,67 @@ async def test_run_scrape_job_uses_provided_user_id():
     # The Run object added to session should have user_id=99
     added_run = mock_session.add.call_args[0][0]
     assert added_run.user_id == 99
+
+
+@pytest.mark.anyio
+async def test_run_scrape_job_skips_within_staleness_window():
+    """_run_scrape_job returns early when last completed run is within the staleness window.
+
+    Regression test for: SQLAlchemy strips tz on SQLite write, so completed_at comes back
+    as a naive UTC datetime. The cutoff must also be naive UTC or Python raises TypeError.
+    """
+    recent_naive_utc = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=30)
+
+    mock_last_run = MagicMock()
+    mock_last_run.completed_at = recent_naive_utc  # naive UTC — as SQLite returns it
+
+    with patch("backend.scheduler.AsyncSessionLocal") as mock_sl, \
+         patch("backend.scheduler.get_setting", return_value=4):  # staleness = 4 hours
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_last_run))
+        )
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_sl.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_sl.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from backend.scheduler import _run_scrape_job
+        # Must not raise TypeError — that was the bug
+        await _run_scrape_job(user_id=1)
+
+    # Skipped: no new Run should have been added
+    mock_session.add.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_run_scrape_job_runs_after_staleness_window():
+    """_run_scrape_job creates a run when the last completed run is outside the staleness window."""
+    old_naive_utc = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=6)
+
+    mock_last_run = MagicMock()
+    mock_last_run.completed_at = old_naive_utc  # naive UTC, 6 hours ago
+
+    with patch("backend.scheduler.AsyncSessionLocal") as mock_sl, \
+         patch("backend.scheduler.get_setting", return_value=4), \
+         patch("backend.pipeline.execute_run", new_callable=AsyncMock):
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_last_run))
+        )
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session.refresh = AsyncMock()
+        mock_sl.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_sl.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from backend.scheduler import _run_scrape_job
+        await _run_scrape_job(user_id=1)
+
+    # Should have created a new run
+    mock_session.add.assert_called_once()
 
 
 @pytest.mark.anyio

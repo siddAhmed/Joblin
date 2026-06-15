@@ -14,7 +14,9 @@ async def _run_scrape_job(user_id: int) -> None:
 
     async with AsyncSessionLocal() as session:
         staleness_hours = float(await get_setting(session, "staleness_threshold_hours", user_id=user_id) or 4)
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=staleness_hours)
+        # SQLAlchemy strips tz on write to SQLite — completed_at comes back naive UTC,
+        # so cutoff must also be naive UTC for the comparison to work.
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=staleness_hours)
         last_run = (await session.execute(
             select(Run)
             .where(Run.status == RunStatus.completed, Run.user_id == user_id)
