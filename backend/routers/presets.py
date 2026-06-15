@@ -20,7 +20,7 @@ async def list_presets(current_user: CurrentUser):
     presets = []
     for path in sorted(PRESETS_DIR.glob("*.json")):
         data = json.loads(path.read_text())
-        presets.append({"name": path.stem, "description": data.get("description", ""), "criteria": data.get("criteria", {})})
+        presets.append({"name": path.stem, "group": data.get("group"), "label": data.get("label"), "description": data.get("description", ""), "criteria": data.get("criteria", {})})
     return presets
 
 
