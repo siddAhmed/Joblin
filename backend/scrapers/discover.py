@@ -3,7 +3,7 @@ import json
 import re
 from urllib.parse import quote_plus
 
-from groq import AsyncGroq
+import anthropic
 from sqlalchemy import select
 
 try:
@@ -11,7 +11,6 @@ try:
 except ModuleNotFoundError:
     _AsyncWebCrawler = None  # type: ignore[assignment,misc]
 
-from backend.config import get_all_settings
 from backend.data.default_companies import DEFAULT_COMPANIES
 from backend.database import AsyncSessionLocal
 from backend.models.company import AtsType, Company
@@ -29,14 +28,6 @@ def _heuristic_candidates(name: str) -> list[str]:
         f"https://jobs.{slug}.com/",
         f"https://{slug}.com/careers",
     ]
-
-
-async def _make_client(user_id: int) -> AsyncGroq:
-    """Load the user's Groq API key from settings and return an AsyncGroq client."""
-    async with AsyncSessionLocal() as session:
-        settings = await get_all_settings(session, user_id)
-    api_key = settings.get("groq_api_key", "")
-    return AsyncGroq(api_key=api_key)
 
 
 async def _search_web(name: str) -> list[str]:
@@ -58,7 +49,7 @@ async def _search_web(name: str) -> list[str]:
 
 
 async def _llm_filter(
-    name: str, candidates: list[str], client: AsyncGroq
+    name: str, candidates: list[str], client: anthropic.AsyncAnthropic
 ) -> list[str]:
     prompt = (
         f"Company: {name}\n\nCandidate URLs:\n"
@@ -69,13 +60,12 @@ async def _llm_filter(
         f"If none look right, return all of them unchanged."
     )
     try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
             max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
         )
-        text = response.choices[0].message.content or ""
+        text = response.content[0].text if response.content else ""
         m = re.search(r"\[.*?\]", text, re.DOTALL)
         if m:
             urls = json.loads(m.group())
@@ -87,7 +77,7 @@ async def _llm_filter(
 
 
 async def _llm_analyze_page(
-    name: str, markdown: str, client: AsyncGroq
+    name: str, markdown: str, client: anthropic.AsyncAnthropic
 ) -> dict | None:
     prompt = (
         f"You are analyzing a careers page for '{name}'.\n\n"
@@ -99,13 +89,12 @@ async def _llm_analyze_page(
         f'If you cannot determine the ATS, use "crawl4ai".'
     )
     try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
         )
-        text = response.choices[0].message.content or ""
+        text = response.content[0].text if response.content else ""
         m = re.search(r"\{.*?\}", text, re.DOTALL)
         if m:
             return json.loads(m.group())
@@ -142,8 +131,8 @@ async def _resolve(
             await session.commit()
 
 
-async def _run_discovery(company_id: int, name: str, user_id: int) -> None:
-    client = await _make_client(user_id)
+async def _run_discovery(company_id: int, name: str) -> None:
+    client = anthropic.AsyncAnthropic()
 
     # Step 1: Catalog fast path
     catalog_entry = next(
@@ -222,8 +211,8 @@ async def _run_discovery(company_id: int, name: str, user_id: int) -> None:
         await _update_status(company_id, "Could not find — paste URL manually", "failed")
 
 
-async def discover_company(company_id: int, name: str, user_id: int) -> None:
+async def discover_company(company_id: int, name: str) -> None:
     try:
-        await asyncio.wait_for(_run_discovery(company_id, name, user_id), timeout=90.0)
+        await asyncio.wait_for(_run_discovery(company_id, name), timeout=90.0)
     except (asyncio.TimeoutError, Exception):
         await _update_status(company_id, "Could not find — paste URL manually", "failed")

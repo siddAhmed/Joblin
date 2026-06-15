@@ -14,9 +14,9 @@ async def test_catalog_fastpath_skips_web_search():
         patch("backend.scrapers.discover._update_status", new_callable=AsyncMock),
         patch("backend.scrapers.discover._resolve", new_callable=AsyncMock) as mock_resolve,
         patch("backend.scrapers.discover._search_web", new_callable=AsyncMock) as mock_search,
-        patch("backend.scrapers.discover._make_client", new_callable=AsyncMock),
+        patch("backend.scrapers.discover.anthropic.AsyncAnthropic"),
     ):
-        await discover_company(1, "Google", user_id=1)
+        await discover_company(1, "Google")
 
     mock_search.assert_not_called()
     mock_resolve.assert_awaited_once_with(1, "greenhouse", "google", "https://careers.google.com/")
@@ -31,9 +31,9 @@ async def test_catalog_lookup_case_insensitive():
         patch("backend.scrapers.discover._update_status", new_callable=AsyncMock),
         patch("backend.scrapers.discover._resolve", new_callable=AsyncMock) as mock_resolve,
         patch("backend.scrapers.discover._search_web", new_callable=AsyncMock) as mock_search,
-        patch("backend.scrapers.discover._make_client", new_callable=AsyncMock),
+        patch("backend.scrapers.discover.anthropic.AsyncAnthropic"),
     ):
-        await discover_company(1, "google", user_id=1)
+        await discover_company(1, "google")
 
     mock_search.assert_not_called()
     mock_resolve.assert_awaited_once()
@@ -63,9 +63,9 @@ async def test_unknown_company_probes_candidates():
               side_effect=[mock_probe_crawl, mock_probe_ashby, mock_probe_crawl, mock_probe_crawl]),
         patch("backend.scrapers.discover._update_status", new_callable=AsyncMock),
         patch("backend.scrapers.discover._resolve", new_callable=AsyncMock) as mock_resolve,
-        patch("backend.scrapers.discover._make_client", new_callable=AsyncMock),
+        patch("backend.scrapers.discover.anthropic.AsyncAnthropic"),
     ):
-        await discover_company(42, "Acme Corp", user_id=1)
+        await discover_company(42, "Acme Corp")
 
     mock_resolve.assert_awaited_once()
     call_args = mock_resolve.call_args[0]
@@ -82,7 +82,7 @@ async def test_timeout_marks_company_failed():
         patch("backend.scrapers.discover._run_discovery", side_effect=slow),
         patch("backend.scrapers.discover._update_status", new_callable=AsyncMock) as mock_status,
     ):
-        await discover_company(99, "Slow Corp", user_id=1)
+        await discover_company(99, "Slow Corp")
 
     mock_status.assert_awaited_with(99, "Could not find — paste URL manually", "failed")
 
@@ -94,8 +94,8 @@ async def test_no_candidates_marks_failed():
         patch("backend.scrapers.discover._heuristic_candidates", return_value=[]),
         patch("backend.scrapers.discover._update_status", new_callable=AsyncMock) as mock_status,
         patch("backend.scrapers.discover._resolve", new_callable=AsyncMock),
-        patch("backend.scrapers.discover._make_client", new_callable=AsyncMock),
+        patch("backend.scrapers.discover.anthropic.AsyncAnthropic"),
     ):
-        await discover_company(7, "Nonexistent Co", user_id=1)
+        await discover_company(7, "Nonexistent Co")
 
     mock_status.assert_awaited_with(7, "Could not find — paste URL manually", "failed")
