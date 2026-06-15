@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 from typing import Annotated
@@ -35,6 +36,11 @@ class ProbeRequest(BaseModel):
     careers_url: str
 
 
+class BulkCompanyItem(BaseModel):
+    name: str
+    careers_url: str
+
+
 @router.get("")
 async def list_companies(session: Session, current_user: CurrentUser):
     rows = (await session.execute(
@@ -46,6 +52,8 @@ async def list_companies(session: Session, current_user: CurrentUser):
             "ats_type": c.ats_type, "is_active": c.is_active,
             "quarantine_count": c.quarantine_count, "quarantined_at": c.quarantined_at,
             "quarantine_reason": c.quarantine_reason,
+            "discovery_status": getattr(c, "discovery_status", "none"),
+            "discovery_message": getattr(c, "discovery_message", None),
         }
         for c in rows
     ]
@@ -54,6 +62,32 @@ async def list_companies(session: Session, current_user: CurrentUser):
 @router.get("/defaults")
 async def get_default_companies(current_user: CurrentUser):
     return DEFAULT_COMPANIES
+
+
+@router.post("/bulk", status_code=201)
+async def bulk_add_companies(
+    items: list[BulkCompanyItem],
+    session: Session,
+    current_user: CurrentUser,
+):
+    sem = asyncio.Semaphore(20)
+
+    async def probe_and_build(item: BulkCompanyItem) -> Company:
+        async with sem:
+            probe = await probe_ats(item.careers_url, item.name)
+            return Company(
+                name=item.name,
+                careers_url=item.careers_url,
+                ats_type=AtsType(probe.ats_type),
+                ats_identifier=probe.identifier,
+                user_id=current_user.id,
+            )
+
+    companies = await asyncio.gather(*[probe_and_build(item) for item in items])
+    for company in companies:
+        session.add(company)
+    await session.commit()
+    return {"created": len(companies)}
 
 
 @router.post("/probe")

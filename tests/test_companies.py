@@ -44,3 +44,28 @@ async def test_get_defaults_returns_catalog(client):
     names = [c["name"] for c in data]
     assert "Google" in names
     assert "Stripe" in names
+
+
+async def test_bulk_add_companies(client):
+    mock_gh = ProbeResult(ats_type="greenhouse", identifier="stripe", probe_attempts=[])
+    mock_crawl = ProbeResult(ats_type="crawl4ai", identifier=None, probe_attempts=[])
+
+    with patch("backend.routers.companies.probe_ats", side_effect=[mock_gh, mock_crawl]):
+        response = await client.post("/api/companies/bulk", json=[
+            {"name": "Stripe", "careers_url": "https://stripe.com/jobs"},
+            {"name": "Acme", "careers_url": "https://acme.com/careers"},
+        ])
+
+    assert response.status_code == 201
+    assert response.json()["created"] == 2
+
+    list_resp = await client.get("/api/companies")
+    names = [c["name"] for c in list_resp.json()]
+    assert "Stripe" in names
+    assert "Acme" in names
+
+
+async def test_bulk_add_empty_list(client):
+    response = await client.post("/api/companies/bulk", json=[])
+    assert response.status_code == 201
+    assert response.json()["created"] == 0
