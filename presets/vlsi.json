@@ -1,0 +1,14 @@
+{
+  "group": "experienced",
+  "label": "VLSI / Hardware engineer",
+  "description": "RTL design, ASIC verification, FPGA",
+  "criteria": {
+    "title_allowlist": "vlsi|rtl|fpga|verilog|vhdl|system.?verilog|asic|chip design|physical design|verification engineer|dft|mixed.?signal",
+    "title_denylist": "intern|contract|marketing|sales|frontend|backend|data science",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["senior", "staff", "principal", "lead"],
+    "exclusion_keywords": ["clearance required", "on-site only"],
+    "profile_description": "Experienced hardware engineer skilled in RTL design, ASIC verification, and FPGA development. Seeking senior roles at semiconductor companies and silicon teams."
+  }
+}
