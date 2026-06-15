@@ -7,6 +7,14 @@ import { runsApi } from "@/api/runs";
 
 type Step = 1 | 2 | 3 | 4;
 
+interface Preset {
+  name: string;
+  label: string;
+  description: string;
+  group: "experienced" | "intern";
+  criteria: Record<string, unknown>;
+}
+
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>(1);
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -14,12 +22,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [testRunId, setTestRunId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
+  const [stage, setStage] = useState<"experienced" | "intern" | null>(null);
   const qc = useQueryClient();
 
   const { data: defaultCompanies = [] } = useQuery<DefaultCompany[]>({
     queryKey: ["companies-defaults"],
     queryFn: companiesApi.defaults,
     enabled: step === 3,
+  });
+
+  const { data: presets = [] } = useQuery<Preset[]>({
+    queryKey: ["presets"],
+    queryFn: settingsApi.listPresets,
+    enabled: step === 2,
   });
 
   const filteredCompanies = defaultCompanies.filter((c) =>
@@ -125,38 +140,76 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           {step === 2 && (
             <div>
               <h2 className="text-sm font-semibold mb-3">Step 2: Choose a job criteria preset</h2>
-              <div className="space-y-2 mb-4">
-                {[
-                  { name: "backend-generalist", label: "Backend generalist", desc: "Python, distributed systems, infrastructure" },
-                  { name: "python-ml", label: "Python ML engineer", desc: "ML platform, MLOps, data science" },
-                  { name: "frontend", label: "Frontend engineer", desc: "React, TypeScript, product UI" },
-                ].map((p) => (
-                  <button
-                    key={p.name}
-                    onClick={() => setSelectedPreset(p.name)}
-                    className={`w-full text-left border rounded-lg px-4 py-3 transition-colors ${
-                      selectedPreset === p.name
-                        ? "border-[#4e9eff] bg-[#0e2040]"
-                        : "border-[#2a2a2a] bg-[#0a0a0a] hover:bg-[#111]"
-                    }`}
-                  >
-                    <div className="text-sm text-[#e5e5e5]">{p.label}</div>
-                    <div className="text-[11px] text-[#666]">{p.desc}</div>
+
+              {stage === null ? (
+                <>
+                  <p className="text-xs text-[#666] mb-3">What stage are you at?</p>
+                  <div className="space-y-2 mb-4">
+                    {(
+                      [
+                        { value: "experienced", label: "💼 Experienced", desc: "Senior, staff, or lead-level roles" },
+                        { value: "intern", label: "🎓 Intern / New Grad", desc: "Internships, co-ops, entry-level & new grad roles" },
+                      ] as const
+                    ).map((s) => (
+                      <button
+                        key={s.value}
+                        onClick={() => setStage(s.value)}
+                        className="w-full text-left border border-[#2a2a2a] rounded-lg px-4 py-3 bg-[#0a0a0a] hover:bg-[#111] transition-colors"
+                      >
+                        <div className="text-sm text-[#e5e5e5]">{s.label}</div>
+                        <div className="text-[11px] text-[#666]">{s.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
+                    Skip
                   </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => applyPreset.mutate()}
-                  disabled={!selectedPreset || applyPreset.isPending}
-                  className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
-                >
-                  {applyPreset.isPending ? "Applying..." : "Apply and continue"}
-                </button>
-                <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
-                  Skip
-                </button>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      onClick={() => { setStage(null); setSelectedPreset(null); }}
+                      className="text-xs text-[#4e9eff] hover:underline"
+                    >
+                      ← Back
+                    </button>
+                    <span className="text-xs text-[#555]">
+                      {stage === "experienced" ? "Experienced" : "Intern / New Grad"}
+                    </span>
+                  </div>
+                  <div className="space-y-2 mb-4">
+                    {presets
+                      .filter((p) => p.group === stage)
+                      .map((p) => (
+                        <button
+                          key={p.name}
+                          onClick={() => setSelectedPreset(p.name)}
+                          className={`w-full text-left border rounded-lg px-4 py-3 transition-colors ${
+                            selectedPreset === p.name
+                              ? "border-[#4e9eff] bg-[#0e2040]"
+                              : "border-[#2a2a2a] bg-[#0a0a0a] hover:bg-[#111]"
+                          }`}
+                        >
+                          <div className="text-sm text-[#e5e5e5]">{p.label}</div>
+                          <div className="text-[11px] text-[#666]">{p.description}</div>
+                        </button>
+                      ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => applyPreset.mutate()}
+                      disabled={!selectedPreset || applyPreset.isPending}
+                      className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
+                    >
+                      {applyPreset.isPending ? "Applying..." : "Apply and continue"}
+                    </button>
+                    <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
+                      Skip
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
