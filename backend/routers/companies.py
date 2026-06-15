@@ -11,6 +11,7 @@ from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.models.company import Company, AtsType
 from backend.scrapers.probe import probe_ats
+from backend.data.default_companies import DEFAULT_COMPANIES
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -48,6 +49,11 @@ async def list_companies(session: Session, current_user: CurrentUser):
         }
         for c in rows
     ]
+
+
+@router.get("/defaults")
+async def get_default_companies(current_user: CurrentUser):
+    return DEFAULT_COMPANIES
 
 
 @router.post("/probe")

@@ -32,3 +32,15 @@ async def test_delete_company(client):
 
     list_resp = await client.get("/api/companies")
     assert list_resp.json() == []
+
+
+async def test_get_defaults_returns_catalog(client):
+    response = await client.get("/api/companies/defaults")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 100
+    assert all("name" in c and "careers_url" in c for c in data)
+    names = [c["name"] for c in data]
+    assert "Google" in names
+    assert "Stripe" in names
