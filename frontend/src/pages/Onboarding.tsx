@@ -161,7 +161,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
+                  <button onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }} className="text-xs text-[#555] hover:text-[#888]">
                     Skip
                   </button>
                 </>
@@ -204,7 +204,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     >
                       {applyPreset.isPending ? "Applying..." : "Apply and continue"}
                     </button>
-                    <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
+                    <button onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }} className="text-xs text-[#555] hover:text-[#888]">
                       Skip
                     </button>
                   </div>
