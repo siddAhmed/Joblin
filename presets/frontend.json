@@ -1,5 +1,7 @@
 {
-  "description": "Frontend engineer: React, TypeScript, product UI",
+  "group": "experienced",
+  "label": "Frontend engineer",
+  "description": "React, TypeScript, product UI",
   "criteria": {
     "title_allowlist": "front.?end|ui engineer|react|web engineer|javascript|typescript",
     "title_denylist": "intern|contract|backend|mobile",

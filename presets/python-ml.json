@@ -1,5 +1,7 @@
 {
-  "description": "Python ML engineer: ML platform, MLOps, data science",
+  "group": "experienced",
+  "label": "Python ML engineer",
+  "description": "ML platform, MLOps, data science",
   "criteria": {
     "title_allowlist": "machine learning|ml engineer|ml platform|mlops|data scientist|ai engineer|research engineer",
     "title_denylist": "intern|contract|front.?end|mobile",

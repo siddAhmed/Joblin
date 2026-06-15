@@ -1,5 +1,7 @@
 {
-  "description": "Backend generalist: Python, distributed systems, infrastructure",
+  "group": "experienced",
+  "label": "Backend generalist",
+  "description": "Python, distributed systems, infrastructure",
   "criteria": {
     "title_allowlist": "backend|platform|infrastructure|systems|distributed|data engineer|api",
     "title_denylist": "intern|contract|marketing|sales|design|front.?end",
