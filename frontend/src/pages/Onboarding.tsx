@@ -31,7 +31,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     enabled: step === 3,
   });
 
-  const { data: presets = [] } = useQuery<Preset[]>({
+  const { data: presets = [], isPending: presetsLoading, isError: presetsError } = useQuery<Preset[]>({
     queryKey: ["presets"],
     queryFn: settingsApi.listPresets,
     enabled: step === 2,
@@ -179,22 +179,30 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     </span>
                   </div>
                   <div className="space-y-2 mb-4">
-                    {presets
-                      .filter((p) => p.group === stage)
-                      .map((p) => (
-                        <button
-                          key={p.name}
-                          onClick={() => setSelectedPreset(p.name)}
-                          className={`w-full text-left border rounded-lg px-4 py-3 transition-colors ${
-                            selectedPreset === p.name
-                              ? "border-[#4e9eff] bg-[#0e2040]"
-                              : "border-[#2a2a2a] bg-[#0a0a0a] hover:bg-[#111]"
-                          }`}
-                        >
-                          <div className="text-sm text-[#e5e5e5]">{p.label}</div>
-                          <div className="text-[11px] text-[#666]">{p.description}</div>
-                        </button>
-                      ))}
+                    {presetsLoading ? (
+                      <p className="text-xs text-[#555] py-4 text-center">Loading presets...</p>
+                    ) : presetsError ? (
+                      <p className="text-xs text-[#f87171] py-4 text-center">Failed to load presets. Please try again.</p>
+                    ) : presets.filter((p) => p.group === stage).length === 0 ? (
+                      <p className="text-xs text-[#555] py-4 text-center">No presets available.</p>
+                    ) : (
+                      presets
+                        .filter((p) => p.group === stage)
+                        .map((p) => (
+                          <button
+                            key={p.name}
+                            onClick={() => setSelectedPreset(p.name)}
+                            className={`w-full text-left border rounded-lg px-4 py-3 transition-colors ${
+                              selectedPreset === p.name
+                                ? "border-[#4e9eff] bg-[#0e2040]"
+                                : "border-[#2a2a2a] bg-[#0a0a0a] hover:bg-[#111]"
+                            }`}
+                          >
+                            <div className="text-sm text-[#e5e5e5]">{p.label}</div>
+                            <div className="text-[11px] text-[#666]">{p.description}</div>
+                          </button>
+                        ))
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
