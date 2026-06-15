@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass, field
 import httpx
 
@@ -24,14 +25,11 @@ def _slug_from_url(url: str) -> str:
 
 async def probe_ats(careers_url: str, name_hint: str) -> ProbeResult:
     url_slug = _slug_from_url(careers_url)
-    # Use name_hint as the primary slug; url_slug is only useful if it looks like
-    # a company identifier (not a generic path segment like "jobs" or "careers").
     generic_segments = {"jobs", "careers", "job", "career", "openings", "positions", ""}
     if url_slug and url_slug.lower() not in generic_segments:
         slug = url_slug
     else:
         slug = name_hint.lower().replace(" ", "-")
-    attempts: list[ProbeAttempt] = []
 
     candidates = [
         ("greenhouse", f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"),
@@ -43,17 +41,27 @@ async def probe_ats(careers_url: str, name_hint: str) -> ProbeResult:
     ]
 
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-        for ats_type, url in candidates:
+
+        async def try_one(ats_type: str, url: str) -> tuple[str, str, int | None, str | None]:
             try:
                 resp = await client.get(url)
-                attempts.append(ProbeAttempt(url=url, status_code=resp.status_code))
-                if resp.status_code == 200:
-                    if ats_type == "workday":
-                        if "workday.com" in careers_url or "myworkdayjobs.com" in careers_url:
-                            return ProbeResult(ats_type="workday", identifier=careers_url, probe_attempts=attempts)
-                    else:
-                        return ProbeResult(ats_type=ats_type, identifier=slug, probe_attempts=attempts)
+                return (ats_type, url, resp.status_code, None)
             except Exception as exc:
-                attempts.append(ProbeAttempt(url=url, status_code=None, error=str(exc)))
+                return (ats_type, url, None, str(exc))
+
+        results = await asyncio.gather(*[try_one(t, u) for t, u in candidates])
+
+    attempts = [
+        ProbeAttempt(url=url, status_code=status_code, error=error)
+        for _, url, status_code, error in results
+    ]
+
+    for ats_type, _, status_code, _ in results:
+        if status_code == 200:
+            if ats_type == "workday":
+                if "workday.com" in careers_url or "myworkdayjobs.com" in careers_url:
+                    return ProbeResult(ats_type="workday", identifier=careers_url, probe_attempts=attempts)
+            else:
+                return ProbeResult(ats_type=ats_type, identifier=slug, probe_attempts=attempts)
 
     return ProbeResult(ats_type="crawl4ai", identifier=None, probe_attempts=attempts)

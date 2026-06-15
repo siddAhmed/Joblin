@@ -178,11 +178,19 @@ def test_workday_tenant_extraction_fails_gracefully():
     assert tenant is None
 
 
-from backend.scrapers.crawl4ai import fetch_crawl4ai_jobs
+try:
+    from backend.scrapers.crawl4ai import fetch_crawl4ai_jobs as _fetch_crawl4ai_jobs
+    _crawl4ai_available = True
+except ModuleNotFoundError:
+    _crawl4ai_available = False
+
+import pytest
 
 
+@pytest.mark.skipif(not _crawl4ai_available, reason="crawl4ai not installed")
 async def test_crawl4ai_returns_empty_on_no_jobs():
     from unittest.mock import MagicMock
+    from backend.scrapers.crawl4ai import fetch_crawl4ai_jobs
     mock_result = MagicMock()
     mock_result.success = True
     mock_result.markdown = "No open positions at this time."
@@ -193,3 +201,52 @@ async def test_crawl4ai_returns_empty_on_no_jobs():
         jobs = await fetch_crawl4ai_jobs("https://example.com/careers", css_selector=None)
 
     assert jobs == []
+
+
+# ---------------------------------------------------------------------------
+# Parallel ATS probing tests
+# ---------------------------------------------------------------------------
+
+async def test_probe_ats_fires_all_six_in_parallel():
+    """All 6 ATS candidates are probed concurrently; greenhouse (index 0) wins."""
+    from unittest.mock import MagicMock
+    called_urls = []
+
+    async def fake_get(url, **kwargs):
+        called_urls.append(url)
+        m = MagicMock()
+        m.status_code = 200 if "greenhouse" in url else 404
+        return m
+
+    mock_instance = MagicMock()
+    mock_instance.get = fake_get
+    mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+    mock_instance.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("backend.scrapers.probe.httpx.AsyncClient", return_value=mock_instance):
+        result = await probe_ats("https://stripe.com/jobs", "stripe")
+
+    assert len(called_urls) == 6, "All 6 ATS types must be probed"
+    assert result.ats_type == "greenhouse"
+    assert result.identifier == "stripe"
+    assert len(result.probe_attempts) == 6
+
+
+async def test_probe_ats_priority_order_respected():
+    """When both greenhouse and lever return 200, greenhouse wins (lower index)."""
+    from unittest.mock import MagicMock
+
+    async def fake_get(url, **kwargs):
+        m = MagicMock()
+        m.status_code = 200 if ("greenhouse" in url or "lever" in url) else 404
+        return m
+
+    mock_instance = MagicMock()
+    mock_instance.get = fake_get
+    mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+    mock_instance.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("backend.scrapers.probe.httpx.AsyncClient", return_value=mock_instance):
+        result = await probe_ats("https://example.com/careers", "example")
+
+    assert result.ats_type == "greenhouse"
