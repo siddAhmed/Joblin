@@ -214,5 +214,5 @@ async def _run_discovery(company_id: int, name: str) -> None:
 async def discover_company(company_id: int, name: str) -> None:
     try:
         await asyncio.wait_for(_run_discovery(company_id, name), timeout=90.0)
-    except (asyncio.TimeoutError, Exception):
+    except Exception:
         await _update_status(company_id, "Could not find — paste URL manually", "failed")

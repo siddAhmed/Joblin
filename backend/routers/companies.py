@@ -15,6 +15,8 @@ from backend.scrapers.probe import probe_ats
 from backend.scrapers.discover import discover_company
 from backend.data.default_companies import DEFAULT_COMPANIES
 
+_bg_tasks: set[asyncio.Task] = set()
+
 router = APIRouter(prefix="/companies", tags=["companies"])
 Session = Annotated[AsyncSession, Depends(get_session)]
 
@@ -79,6 +81,13 @@ async def bulk_add_companies(
     session: Session,
     current_user: CurrentUser,
 ):
+    existing = set(
+        row[0] for row in (await session.execute(
+            select(Company.name).where(Company.user_id == current_user.id)
+        )).all()
+    )
+    items = [item for item in items if item.name not in existing]
+
     sem = asyncio.Semaphore(20)
 
     async def probe_and_build(item: BulkCompanyItem) -> Company:
@@ -105,10 +114,15 @@ async def discover_companies(
     session: Session,
     current_user: CurrentUser,
 ):
+    existing = set(
+        row[0] for row in (await session.execute(
+            select(Company.name).where(Company.user_id == current_user.id)
+        )).all()
+    )
     companies = []
     for name in req.names:
         name = name.strip()
-        if not name:
+        if not name or name in existing:
             continue
         company = Company(
             name=name,
@@ -126,7 +140,9 @@ async def discover_companies(
     await session.commit()  # rows now visible to background tasks
 
     for company, name in companies:
-        asyncio.create_task(discover_company(company.id, name))
+        task = asyncio.create_task(discover_company(company.id, name))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
 
     return {"created": len(companies), "ids": [c.id for c, _ in companies]}
 
@@ -160,6 +176,28 @@ async def add_company(req: CompanyCreate, session: Session, current_user: Curren
     return {"id": company.id, "ats_type": company.ats_type, "probe_attempts": [
         {"url": a.url, "status_code": a.status_code} for a in probe.probe_attempts
     ]}
+
+
+@router.post("/import", status_code=201)
+async def import_companies(file: UploadFile, session: Session, current_user: CurrentUser):
+    content = (await file.read()).decode("utf-8")
+    reader = csv.DictReader(io.StringIO(content))
+    created = []
+    for row in reader:
+        name = row.get("name", "").strip()
+        url = row.get("careers_url", "").strip()
+        if not name or not url:
+            continue
+        probe = await probe_ats(url, name)
+        company = Company(
+            name=name, careers_url=url,
+            ats_type=AtsType(probe.ats_type), ats_identifier=probe.identifier,
+            user_id=current_user.id,
+        )
+        session.add(company)
+        created.append(name)
+    await session.commit()
+    return {"created": len(created), "names": created}
 
 
 @router.patch("/{company_id}")
@@ -223,25 +261,3 @@ async def resolve_company(
     company.is_active = True
     await session.commit()
     return {"id": company.id, "ats_type": company.ats_type}
-
-
-@router.post("/import", status_code=201)
-async def import_companies(file: UploadFile, session: Session, current_user: CurrentUser):
-    content = (await file.read()).decode("utf-8")
-    reader = csv.DictReader(io.StringIO(content))
-    created = []
-    for row in reader:
-        name = row.get("name", "").strip()
-        url = row.get("careers_url", "").strip()
-        if not name or not url:
-            continue
-        probe = await probe_ats(url, name)
-        company = Company(
-            name=name, careers_url=url,
-            ats_type=AtsType(probe.ats_type), ats_identifier=probe.identifier,
-            user_id=current_user.id,
-        )
-        session.add(company)
-        created.append(name)
-    await session.commit()
-    return {"created": len(created), "names": created}
