@@ -52,8 +52,8 @@ async def list_companies(session: Session, current_user: CurrentUser):
             "ats_type": c.ats_type, "is_active": c.is_active,
             "quarantine_count": c.quarantine_count, "quarantined_at": c.quarantined_at,
             "quarantine_reason": c.quarantine_reason,
-            "discovery_status": getattr(c, "discovery_status", "none"),
-            "discovery_message": getattr(c, "discovery_message", None),
+            "discovery_status": c.discovery_status,
+            "discovery_message": c.discovery_message,
         }
         for c in rows
     ]

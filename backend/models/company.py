@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 from backend.database import Base
 
@@ -35,3 +35,7 @@ class Company(Base):
         DateTime, server_default=func.now(), onupdate=func.now()
     )
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    discovery_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="none", server_default="none"
+    )
+    discovery_message: Mapped[str | None] = mapped_column(Text, nullable=True)
