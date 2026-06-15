@@ -15,6 +15,20 @@ Add `"group": "experienced"` to all three existing preset files:
 
 No other changes to existing presets. The `GET /presets` router already returns all JSON fields, so `group` appears in the response automatically — no backend router changes needed.
 
+### New experienced preset
+
+One additional experienced preset:
+
+| File | Label | title_allowlist |
+|---|---|---|
+| `vlsi.json` | VLSI / Hardware Engineer | `vlsi\|rtl\|fpga\|verilog\|vhdl\|system.?verilog\|asic\|chip design\|physical design\|verification engineer\|dft\|mixed.?signal` |
+
+- `"group": "experienced"`
+- `title_denylist`: `"intern|contract|marketing|sales|design(?!.*engineer)|frontend|backend|data science"`
+- `seniority_allowlist`: `["senior", "staff", "principal", "lead"]`
+- `exclusion_keywords`: `["clearance required", "on-site only"]`
+- `profile_description`: `"Experienced hardware engineer skilled in RTL design, ASIC verification, and FPGA development. Seeking senior roles at semiconductor companies and silicon teams."`
+
 ### New intern preset files
 
 Five new files in `presets/`:
@@ -79,6 +93,7 @@ Step 2 renders two sub-steps based on `stage`:
 
 ## File Checklist
 
+- [ ] `presets/vlsi.json` — new (experienced)
 - [ ] `presets/backend-generalist.json` — add `group`
 - [ ] `presets/frontend.json` — add `group`
 - [ ] `presets/python-ml.json` — add `group`
