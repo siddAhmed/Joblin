@@ -12,6 +12,7 @@ from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.models.company import Company, AtsType
 from backend.scrapers.probe import probe_ats
+from backend.scrapers.discover import discover_company
 from backend.data.default_companies import DEFAULT_COMPANIES
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -38,6 +39,14 @@ class ProbeRequest(BaseModel):
 
 class BulkCompanyItem(BaseModel):
     name: str
+    careers_url: str
+
+
+class DiscoverRequest(BaseModel):
+    names: list[str]
+
+
+class ResolveRequest(BaseModel):
     careers_url: str
 
 
@@ -88,6 +97,38 @@ async def bulk_add_companies(
         session.add(company)
     await session.commit()
     return {"created": len(companies)}
+
+
+@router.post("/discover", status_code=202)
+async def discover_companies(
+    req: DiscoverRequest,
+    session: Session,
+    current_user: CurrentUser,
+):
+    companies = []
+    for name in req.names:
+        name = name.strip()
+        if not name:
+            continue
+        company = Company(
+            name=name,
+            careers_url="",
+            ats_type=AtsType.crawl4ai,
+            is_active=False,
+            discovery_status="discovering",
+            discovery_message="Queued...",
+            user_id=current_user.id,
+        )
+        session.add(company)
+        companies.append((company, name))
+
+    await session.flush()   # assigns IDs without committing
+    await session.commit()  # rows now visible to background tasks
+
+    for company, name in companies:
+        asyncio.create_task(discover_company(company.id, name))
+
+    return {"created": len(companies), "ids": [c.id for c, _ in companies]}
 
 
 @router.post("/probe")
@@ -158,6 +199,30 @@ async def retry_company(company_id: int, session: Session, current_user: Current
     company.is_active = True
     await session.commit()
     return {"id": company.id, "status": "reactivated"}
+
+
+@router.post("/{company_id}/resolve")
+async def resolve_company(
+    company_id: int,
+    req: ResolveRequest,
+    session: Session,
+    current_user: CurrentUser,
+):
+    company = (await session.execute(
+        select(Company).where(Company.id == company_id, Company.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    probe = await probe_ats(req.careers_url, company.name)
+    company.careers_url = req.careers_url
+    company.ats_type = AtsType(probe.ats_type)
+    company.ats_identifier = probe.identifier
+    company.discovery_status = "none"
+    company.discovery_message = None
+    company.is_active = True
+    await session.commit()
+    return {"id": company.id, "ats_type": company.ats_type}
 
 
 @router.post("/import", status_code=201)

@@ -69,3 +69,53 @@ async def test_bulk_add_empty_list(client):
     response = await client.post("/api/companies/bulk", json=[])
     assert response.status_code == 201
     assert response.json()["created"] == 0
+
+
+async def test_discover_creates_companies_in_discovering_state(client):
+    import asyncio as _asyncio
+
+    def _fake_create_task(coro, **kwargs):
+        # Close the coroutine to avoid "never awaited" warning, return a done future
+        coro.close()
+        fut = _asyncio.get_event_loop().create_future()
+        fut.set_result(None)
+        return fut
+
+    with patch("backend.routers.companies.asyncio.create_task", side_effect=_fake_create_task), \
+         patch("backend.routers.companies.discover_company", new_callable=AsyncMock):
+        response = await client.post("/api/companies/discover", json={"names": ["Anthropic", "Mistral"]})
+
+    assert response.status_code == 202
+    data = response.json()
+    assert data["created"] == 2
+    assert len(data["ids"]) == 2
+
+    list_resp = await client.get("/api/companies")
+    companies = list_resp.json()
+    statuses = {c["name"]: c["discovery_status"] for c in companies}
+    assert statuses["Anthropic"] == "discovering"
+    assert statuses["Mistral"] == "discovering"
+
+
+async def test_resolve_company_runs_probe_and_clears_status(client):
+    mock_crawl = ProbeResult(ats_type="crawl4ai", identifier=None, probe_attempts=[])
+    with patch("backend.routers.companies.probe_ats", return_value=mock_crawl):
+        create_resp = await client.post(
+            "/api/companies",
+            json={"name": "SomeCo", "careers_url": "https://some.co/jobs"},
+        )
+    company_id = create_resp.json()["id"]
+
+    mock_gh = ProbeResult(ats_type="greenhouse", identifier="someco", probe_attempts=[])
+    with patch("backend.routers.companies.probe_ats", return_value=mock_gh):
+        resolve_resp = await client.post(
+            f"/api/companies/{company_id}/resolve",
+            json={"careers_url": "https://someco.greenhouse.io/"},
+        )
+
+    assert resolve_resp.status_code == 200
+    assert resolve_resp.json()["ats_type"] == "greenhouse"
+
+    list_resp = await client.get("/api/companies")
+    company = next(c for c in list_resp.json() if c["id"] == company_id)
+    assert company["discovery_status"] == "none"
