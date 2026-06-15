@@ -1,0 +1,14 @@
+{
+  "group": "intern",
+  "label": "Frontend",
+  "description": "React, TypeScript, web UI",
+  "criteria": {
+    "title_allowlist": "intern|co.?op|new.?grad|entry.?level|junior|associate|front.?end|ui engineer|react|web",
+    "title_denylist": "contract|marketing|sales|design",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["intern", "new grad", "entry level", "junior", "associate"],
+    "exclusion_keywords": ["clearance required", "on-site only"],
+    "profile_description": "New grad or intern interested in frontend development with React, TypeScript, and modern web UI."
+  }
+}

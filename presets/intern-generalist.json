@@ -1,0 +1,14 @@
+{
+  "group": "intern",
+  "label": "Generalist",
+  "description": "Any intern or new grad SWE role",
+  "criteria": {
+    "title_allowlist": "intern|co.?op|new.?grad|entry.?level|junior|associate",
+    "title_denylist": "contract|marketing|sales|design",
+    "location_allowlist": "",
+    "location_denylist": "",
+    "seniority_allowlist": ["intern", "new grad", "entry level", "junior", "associate"],
+    "exclusion_keywords": ["clearance required", "on-site only"],
+    "profile_description": "New grad or intern seeking entry-level software engineering roles across any discipline."
+  }
+}
