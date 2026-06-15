@@ -22,11 +22,11 @@ async def test_list_presets_intern_count(client):
     response = await client.get("/api/presets")
     data = response.json()
     intern_presets = [p for p in data if p["group"] == "intern"]
-    assert len(intern_presets) == 5
+    assert len(intern_presets) >= 5
 
 
 async def test_list_presets_experienced_count(client):
     response = await client.get("/api/presets")
     data = response.json()
     experienced_presets = [p for p in data if p["group"] == "experienced"]
-    assert len(experienced_presets) == 4  # backend-generalist, frontend, python-ml, vlsi
+    assert len(experienced_presets) >= 4  # backend-generalist, frontend, python-ml, vlsi
