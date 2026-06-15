@@ -1,12 +1,20 @@
 :80 {
-    forward_auth host.docker.internal:9000 {
-        uri /outpost.goauthentik.io/auth/caddy
-        copy_headers X-authentik-username X-authentik-email X-authentik-name
+    @authentik path /outpost.goauthentik.io/* /application/* /if/* /static/* /-/static/* /flows/* /api/v3/* /api/system/*
 
-        @goauthentik_proxy_response header X-Goauthentik-Auth-Redirect .
-        handle_response @goauthentik_proxy_response {
-            redir * {http.reverse_proxy.header.Location} 302
+    handle @authentik {
+        reverse_proxy host.docker.internal:9000 {
+            header_up X-Forwarded-Proto https
+            header_up Host {http.request.host}
         }
     }
-    reverse_proxy app:8000
+
+    handle {
+        forward_auth host.docker.internal:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            copy_headers X-authentik-username X-authentik-email X-authentik-name
+            header_up X-Forwarded-Proto https
+            header_up Host {http.request.host}
+        }
+        reverse_proxy app:8000
+    }
 }
