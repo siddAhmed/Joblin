@@ -31,7 +31,16 @@ async def start_run(req: RunCreate, background_tasks: BackgroundTasks, session: 
 
     async def run_in_background(run_id: int):
         async with AsyncSessionLocal() as bg_session:
-            await execute_run(run_id, bg_session)
+            try:
+                await execute_run(run_id, bg_session)
+            except Exception:
+                await bg_session.rollback()
+                run_obj = await bg_session.get(Run, run_id)
+                if run_obj and run_obj.status == RunStatus.running:
+                    from datetime import datetime, timezone
+                    run_obj.status = RunStatus.failed
+                    run_obj.completed_at = datetime.now(timezone.utc)
+                    await bg_session.commit()
 
     background_tasks.add_task(run_in_background, run.id)
     return {"id": run.id, "status": run.status}

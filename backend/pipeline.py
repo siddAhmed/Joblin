@@ -250,17 +250,27 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
                     total_tokens=summarize_provider.last_usage["total_tokens"],
                 ))
 
-            match = Match(
-                job_id=job.id,
-                run_id=run_id,
-                score=filter_result.score,
-                tier=tier,
-                summary=summary,
-                filter_reasoning=filter_result.reasoning,
-                is_preview=is_preview,
-            )
-            session.add(match)
-            await session.flush()
+            existing_match = (await session.execute(
+                sa_select(Match).where(Match.job_id == job.id)
+            )).scalar_one_or_none()
+
+            if existing_match:
+                # Job was confirmed in a previous (preview) run; promote to real match
+                if existing_match.is_preview:
+                    existing_match.is_preview = False
+                match = existing_match
+            else:
+                match = Match(
+                    job_id=job.id,
+                    run_id=run_id,
+                    score=filter_result.score,
+                    tier=tier,
+                    summary=summary,
+                    filter_reasoning=filter_result.reasoning,
+                    is_preview=is_preview,
+                )
+                session.add(match)
+                await session.flush()
             confirmed_count += 1
 
             if not is_preview and not is_seeding_run and settings.get("discord_webhook_url"):
