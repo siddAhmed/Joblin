@@ -147,7 +147,18 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
         await _emit(run_id, "company_scraping", {"company_id": company.id, "company_name": company.name})
 
         try:
-            scraped = await _fetch_jobs(company)
+            scraped = await asyncio.wait_for(_fetch_jobs(company), timeout=60.0)
+        except asyncio.TimeoutError:
+            exc_msg = f"scraper timed out after 60s"
+            company.quarantine_count += 1
+            if company.quarantine_count >= quarantine_threshold:
+                company.quarantined_at = datetime.now(timezone.utc)
+                company.quarantine_reason = exc_msg
+            result_row.status = CompanyResultStatus.failed
+            result_row.error_message = exc_msg
+            await session.commit()
+            await _emit(run_id, "company_failed", {"company_id": company.id, "error": exc_msg})
+            continue
         except Exception as exc:
             company.quarantine_count += 1
             if company.quarantine_count >= quarantine_threshold:
