@@ -47,6 +47,7 @@ async def list_runs(session: Session, current_user: CurrentUser):
             "id": r.id, "status": r.status, "is_preview": r.is_preview,
             "started_at": r.started_at, "completed_at": r.completed_at,
             "total_jobs_found": r.total_jobs_found,
+            "total_new_jobs": r.total_new_jobs,
             "total_confirmed": r.total_confirmed,
             "total_notified": r.total_notified,
         }

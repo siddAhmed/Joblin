@@ -11,13 +11,14 @@ export function Runs() {
     <div>
       {isLoading && <p className="text-[#555] text-sm">Loading...</p>}
       <table className="w-full text-xs">
-        <thead><tr className="border-b border-[#1e1e1e] text-[#555] text-left"><th className="py-2 pr-4">Started</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Found</th><th className="py-2 pr-4">Confirmed</th><th className="py-2">Preview</th></tr></thead>
+        <thead><tr className="border-b border-[#1e1e1e] text-[#555] text-left"><th className="py-2 pr-4">Started</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Scraped</th><th className="py-2 pr-4">New</th><th className="py-2 pr-4">Confirmed</th><th className="py-2">Preview</th></tr></thead>
         <tbody>
           {runs.map((r: Run) => (
             <tr key={r.id} className="border-b border-[#111] hover:bg-[#0f0f0f]">
               <td className="py-2 pr-4"><Link to={`/runs/${r.id}`} className="text-[#4e9eff] hover:underline">{formatDate(r.started_at)}</Link></td>
               <td className="py-2 pr-4"><span className={r.status === "completed" ? "text-emerald-500" : r.status === "running" ? "text-yellow-400" : "text-red-400"}>{r.status}</span></td>
-              <td className="py-2 pr-4 font-mono">{r.total_jobs_found}</td>
+              <td className="py-2 pr-4 font-mono text-[#666]">{r.total_jobs_found}</td>
+              <td className="py-2 pr-4 font-mono">{r.total_new_jobs}</td>
               <td className="py-2 pr-4 font-mono">{r.total_confirmed}</td>
               <td className="py-2">{r.is_preview ? "Yes" : ""}</td>
             </tr>

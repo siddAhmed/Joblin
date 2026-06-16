@@ -7,6 +7,7 @@ export interface Run {
   started_at: string;
   completed_at: string | null;
   total_jobs_found: number;
+  total_new_jobs: number;
   total_confirmed: number;
   total_notified: number;
 }

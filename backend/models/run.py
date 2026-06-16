@@ -29,6 +29,7 @@ class Run(Base):
     is_preview: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     company_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     total_jobs_found: Mapped[int] = mapped_column(Integer, default=0)
+    total_new_jobs: Mapped[int] = mapped_column(Integer, default=0)
     total_passed_heuristic: Mapped[int] = mapped_column(Integer, default=0)
     total_confirmed: Mapped[int] = mapped_column(Integer, default=0)
     total_notified: Mapped[int] = mapped_column(Integer, default=0)

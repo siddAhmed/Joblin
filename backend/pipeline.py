@@ -125,7 +125,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
 
     await _emit(run_id, "run_started", {"run_id": run_id, "company_count": len(companies), "seeding": is_seeding_run})
 
-    total_found = total_heuristic = total_confirmed = total_notified = 0
+    total_found = total_new = total_heuristic = total_confirmed = total_notified = 0
 
     for company in companies:
         if run_id in _cancelled_runs:
@@ -170,6 +170,11 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
 
             if existing:
                 existing.last_seen_at = datetime.now(timezone.utc)
+                # A preview run indexed this job but it has never been processed
+                # by a real run. Treat it as new so the first real run sees it.
+                if not is_preview and existing.preview_only:
+                    existing.preview_only = False
+                    new_jobs.append((existing, sj))
                 continue
 
             job = Job(
@@ -182,11 +187,14 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
                 normalized_title=_normalize(sj.title),
                 normalized_location=_normalize(sj.location or ""),
                 is_active=True,
+                preview_only=is_preview,
                 user_id=company.user_id,
             )
             session.add(job)
             await session.flush()
             new_jobs.append((job, sj))
+
+        total_new += len(new_jobs)
 
         passed = [(job, sj) for job, sj in new_jobs if passes_heuristic(sj, criteria.__dict__)]
         total_heuristic += len(passed)
@@ -295,6 +303,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
         await _emit(run_id, "discord_posted", {"count": total_notified})
 
     run.total_jobs_found = total_found
+    run.total_new_jobs = total_new
     run.total_passed_heuristic = total_heuristic
     run.total_confirmed = total_confirmed
     run.total_notified = total_notified
