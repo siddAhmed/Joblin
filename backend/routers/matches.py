@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,7 @@ async def list_matches(
         .join(Job, Match.job_id == Job.id)
         .join(Company, Job.company_id == Company.id)
         .where(Company.user_id == current_user.id)
+        .where(Match.hidden_at == None)
         .order_by(Match.created_at.desc())
     )
     if tier:
@@ -95,3 +96,17 @@ async def bulk_notify(req: BulkNotifyRequest, session: Session, current_user: Cu
 
     await session.commit()
     return {"notified": notified}
+
+
+@router.post("/{match_id}/dismiss")
+async def dismiss_match(match_id: int, session: Session, current_user: CurrentUser):
+    match = (await session.execute(
+        select(Match)
+        .join(Job, Match.job_id == Job.id)
+        .where(Match.id == match_id, Job.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    match.hidden_at = datetime.now(timezone.utc)
+    await session.commit()
+    return {"status": "dismissed"}
