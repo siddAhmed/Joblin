@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
@@ -71,14 +71,23 @@ function MatchRow({
   selected,
   onSelect,
   trackerMap,
+  autoExpand,
 }: {
   match: Match;
   selected: boolean;
   onSelect: () => void;
   trackerMap: Map<number, ApplicationTracking>;
+  autoExpand?: boolean;
 }) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoExpand ?? false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (autoExpand && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [autoExpand]);
   const { data: job } = useQuery({ queryKey: ["job", match.job_id], queryFn: () => jobsApi.get(match.job_id), enabled: expanded });
   const qc = useQueryClient();
   const applyUrl = match.job_url || job?.url;
@@ -86,7 +95,7 @@ function MatchRow({
 
   const isStrong = match.tier === "strong";
   return (
-    <div className="border border-[#1e1e1e] rounded-lg mb-2 overflow-hidden">
+    <div ref={rowRef} className={`border rounded-lg mb-2 overflow-hidden transition-colors ${autoExpand ? "border-emerald-800/60" : "border-[#1e1e1e]"}`}>
       <div className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-[#111]" onClick={() => setExpanded(!expanded)}>
         <input type="checkbox" checked={selected} onChange={onSelect} onClick={(e) => e.stopPropagation()} />
         <span className={`w-2 h-2 rounded-full shrink-0 ${isStrong ? "bg-emerald-500" : "bg-yellow-500"}`} />
@@ -139,6 +148,8 @@ function MatchRow({
 
 export function Matches() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const expandId = searchParams.get("expand") ? Number(searchParams.get("expand")) : null;
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [tier, setTier] = useState("");
   const qc = useQueryClient();
@@ -231,7 +242,7 @@ export function Matches() {
         )}
       </div>
       {isLoading && <p className="text-[#555] text-sm">Loading...</p>}
-      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} trackerMap={trackerMap} />)}
+      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} trackerMap={trackerMap} autoExpand={m.id === expandId} />)}
     </div>
   );
 }

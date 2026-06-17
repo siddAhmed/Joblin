@@ -17,7 +17,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 function MatchRow({ match }: { match: Match }) {
   const isStrong = match.tier === "strong";
   return (
-    <Link to="/matches" className="flex items-center gap-3 px-4 py-2.5 border border-[#1e1e1e] rounded-lg mb-2 hover:bg-[#111] block">
+    <Link to={`/matches?expand=${match.id}`} className="flex items-center gap-3 px-4 py-2.5 border border-[#1e1e1e] rounded-lg mb-2 hover:bg-[#111] block">
       <span className={`w-2 h-2 rounded-full shrink-0 ${isStrong ? "bg-emerald-500" : "bg-yellow-500"}`} />
       <div className="flex-1 min-w-0">
         <div className="text-sm text-[#e5e5e5] truncate">{match.job_title}</div>
