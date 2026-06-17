@@ -28,7 +28,9 @@ export function TagChips({ value, onChange, suggestions = [], color = "blue" }: 
     value.includes(tag) ? remove(tag) : add(tag);
 
   const commit = () => {
-    input.split(",").map((s) => s.trim()).filter(Boolean).forEach(add);
+    const tags = input.split(",").map((s) => s.trim()).filter(Boolean);
+    const next = [...value, ...tags.filter((t) => !value.includes(t))];
+    if (next.length !== value.length) onChange(next);
     setInput("");
     setAdding(false);
   };

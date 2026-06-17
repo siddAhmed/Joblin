@@ -303,7 +303,7 @@ export function Settings() {
           <div>
             <label className="block text-xs text-[#888] mb-2">seniority levels</label>
             <TagChips
-              value={(criteria.seniority_allowlist as string[]) || []}
+              value={Array.isArray(criteria.seniority_allowlist) ? (criteria.seniority_allowlist as string[]) : []}
               onChange={(v) => update.mutate({ criteria: { ...criteria, seniority_allowlist: v } })}
               suggestions={SENIORITY_SUGGESTIONS}
               color="blue"
@@ -312,7 +312,7 @@ export function Settings() {
           <div>
             <label className="block text-xs text-[#888] mb-2">exclusion keywords</label>
             <TagChips
-              value={(criteria.exclusion_keywords as string[]) || []}
+              value={Array.isArray(criteria.exclusion_keywords) ? (criteria.exclusion_keywords as string[]) : []}
               onChange={(v) => update.mutate({ criteria: { ...criteria, exclusion_keywords: v } })}
               color="red"
             />

@@ -37,8 +37,8 @@ function toCriteriaValues(raw: Record<string, unknown>): CriteriaValues {
     title_denylist: (raw.title_denylist as string) ?? "",
     location_allowlist: (raw.location_allowlist as string) ?? "",
     location_denylist: (raw.location_denylist as string) ?? "",
-    seniority_allowlist: (raw.seniority_allowlist as string[]) ?? [],
-    exclusion_keywords: (raw.exclusion_keywords as string[]) ?? [],
+    seniority_allowlist: Array.isArray(raw.seniority_allowlist) ? (raw.seniority_allowlist as string[]) : [],
+    exclusion_keywords: Array.isArray(raw.exclusion_keywords) ? (raw.exclusion_keywords as string[]) : [],
     profile_description: (raw.profile_description as string) ?? "",
   };
 }
@@ -325,8 +325,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       {saveCriteria.isPending ? "Saving..." : "Apply and continue"}
                     </button>
                     <button
-                      onClick={() => saveCriteria.mutate(criteria)}
-                      disabled={saveCriteria.isPending}
+                      onClick={() => setStep(3)}
                       className="text-xs text-[#555] hover:text-[#888]"
                     >
                       Skip customisation
