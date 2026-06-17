@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { statsApi } from "@/api/stats";
 import { matchesApi } from "@/api/matches";
 import type { Match } from "@/api/matches";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatScore } from "@/lib/utils";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -17,13 +17,22 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 function MatchRow({ match }: { match: Match }) {
   const isStrong = match.tier === "strong";
   return (
-    <div className="flex items-center gap-2 py-1.5 border-b border-[#161616] text-xs">
+    <Link to="/matches" className="flex items-center gap-3 px-4 py-2.5 border border-[#1e1e1e] rounded-lg mb-2 hover:bg-[#111] block">
       <span className={`w-2 h-2 rounded-full shrink-0 ${isStrong ? "bg-emerald-500" : "bg-yellow-500"}`} />
-      <Link to="/matches" className="flex-1 text-[#ccc] hover:text-white truncate">
-        {isStrong ? "Strong match" : "Borderline"} -- score {(match.score * 100).toFixed(0)}%
-      </Link>
-      <span className="text-[#555] font-mono">{formatDate(match.created_at)}</span>
-    </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-[#e5e5e5] truncate">{match.job_title}</div>
+        <div className="text-[11px] text-[#888] truncate">
+          {match.company_name}{match.location ? ` · ${match.location}` : ""}
+        </div>
+        {match.summary && (
+          <div className="text-[11px] text-[#555] truncate mt-0.5">{match.summary}</div>
+        )}
+      </div>
+      <div className="text-right shrink-0">
+        <div className="font-mono text-xs text-[#888]">{formatScore(match.score)}</div>
+        <div className="text-[10px] text-[#444] font-mono">{formatDate(match.created_at)}</div>
+      </div>
+    </Link>
   );
 }
 
@@ -47,7 +56,7 @@ export function Dashboard() {
       </div>
       <div className="text-[10px] uppercase tracking-wider text-[#555] mb-2">Recent matches</div>
       {matches?.length === 0 && <p className="text-[#555] text-sm">No matches yet. Add companies and run a scrape.</p>}
-      {matches?.map((m) => <MatchRow key={m.id} match={m} />)}
+      <div>{matches?.map((m) => <MatchRow key={m.id} match={m} />)}</div>
     </div>
   );
 }
