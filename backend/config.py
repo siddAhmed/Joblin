@@ -36,6 +36,7 @@ DEFAULTS: dict[str, Any] = {
     "llm_filter_provider": "groq",
     "llm_summarize_provider": "cerebras",
     "scheduler_enabled": False,
+    "auto_dismiss_on_apply": True,
 }
 
 

@@ -7,13 +7,16 @@ import { jobsApi } from "@/api/jobs";
 import { formatScore } from "@/lib/utils";
 import { applicationsApi } from "@/api/applications";
 import type { ApplicationTracking, ApplicationStatus } from "@/api/applications";
+import { settingsApi } from "@/api/settings";
 
 function TrackButtons({
   match,
   trackerMap,
+  onApplied,
 }: {
   match: Match;
   trackerMap: Map<number, ApplicationTracking>;
+  onApplied?: () => void;
 }) {
   const qc = useQueryClient();
   const tracked = trackerMap.get(match.job_id);
@@ -29,7 +32,10 @@ function TrackButtons({
         source: "joblin",
         score: match.score,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["applications"] }),
+    onSuccess: (_data, status) => {
+      qc.invalidateQueries({ queryKey: ["applications"] });
+      if (status === "applied") onApplied?.();
+    },
   });
 
   const isInterested = tracked?.status === "interested";
@@ -78,6 +84,7 @@ function MatchRow({
   onSelect: () => void;
   trackerMap: Map<number, ApplicationTracking>;
   autoExpand?: boolean;
+  autoDismissOnApply?: boolean;
 }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(autoExpand ?? false);
@@ -143,7 +150,7 @@ function MatchRow({
                 ↗ View JD
               </a>
             )}
-            <TrackButtons match={match} trackerMap={trackerMap} />
+            <TrackButtons match={match} trackerMap={trackerMap} onApplied={autoDismissOnApply ? () => hideMatch.mutate() : undefined} />
             <button
               onClick={() => navigate(`/resume?jobId=${match.job_id}`)}
               className="text-[11px] border border-[#4e4e9f] rounded px-2 py-1 text-[#a78bfa] hover:bg-[#1a1a3a]"
@@ -165,10 +172,9 @@ export function Matches() {
   const [tier, setTier] = useState("");
   const qc = useQueryClient();
   const { data: matches = [], isLoading } = useQuery({ queryKey: ["matches", tier], queryFn: () => matchesApi.list({ tier: tier || undefined }) });
-  const { data: trackedApps = [] } = useQuery({
-    queryKey: ["applications"],
-    queryFn: () => applicationsApi.list(),
-  });
+  const { data: trackedApps = [] } = useQuery({ queryKey: ["applications"], queryFn: () => applicationsApi.list() });
+  const { data: settings = {} as Record<string, unknown> } = useQuery({ queryKey: ["settings"], queryFn: settingsApi.get });
+  const autoDismissOnApply = settings.auto_dismiss_on_apply !== false;
   const trackerMap = new Map<number, ApplicationTracking>(
     trackedApps
       .filter((a): a is ApplicationTracking & { job_id: number } => a.job_id != null)
@@ -255,7 +261,7 @@ export function Matches() {
         )}
       </div>
       {isLoading && <p className="text-[#555] text-sm">Loading...</p>}
-      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} trackerMap={trackerMap} autoExpand={m.id === expandId} />)}
+      {matches.map((m) => <MatchRow key={m.id} match={m} selected={selected.has(m.id)} onSelect={() => toggle(m.id)} trackerMap={trackerMap} autoExpand={m.id === expandId} autoDismissOnApply={autoDismissOnApply} />)}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import {
   stateToSettingsPayload,
 } from "@/utils/scheduleUtils";
 
-type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets" | "danger";
+type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets" | "behavior" | "danger";
 
 function ScheduleTab({
   settings,
@@ -237,6 +237,7 @@ export function Settings() {
     { key: "schedule", label: "Schedule" },
     { key: "llm", label: "LLM Keys" },
     { key: "presets", label: "Presets" },
+    { key: "behavior", label: "Behavior" },
     { key: "danger", label: "Danger" },
   ];
 
@@ -453,6 +454,25 @@ export function Settings() {
               <button onClick={() => applyPreset.mutate(p.name)} className="text-xs border border-[#4e9eff] rounded px-3 py-1.5 text-[#4e9eff] bg-[#0e2040]">Apply</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "behavior" && (
+        <div className="max-w-md space-y-4">
+          <div className="border border-[#1e1e1e] rounded-lg p-4 bg-[#0a0a0a]">
+            <h3 className="text-xs uppercase tracking-wider text-[#555] mb-3">Matches</h3>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!(s.auto_dismiss_on_apply ?? true)}
+                onChange={(e) => update.mutate({ auto_dismiss_on_apply: e.target.checked })}
+              />
+              <div>
+                <div className="text-sm text-[#ccc]">Auto-dismiss on apply</div>
+                <div className="text-xs text-[#555] mt-0.5">Automatically hide a match from the Matches section when you mark it as Applied.</div>
+              </div>
+            </label>
+          </div>
         </div>
       )}
 
