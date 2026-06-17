@@ -11,8 +11,14 @@ import {
   stateFromSettings,
   stateToSettingsPayload,
 } from "@/utils/scheduleUtils";
+import { TagChips } from "@/components/TagChips";
 
 type Tab = "discord" | "criteria" | "schedule" | "llm" | "presets" | "behavior" | "danger";
+
+const SENIORITY_SUGGESTIONS = [
+  "Senior", "Staff", "Principal", "Lead", "Mid",
+  "Junior", "Intern", "New Grad", "Associate", "Entry Level",
+];
 
 function ScheduleTab({
   settings,
@@ -286,7 +292,32 @@ export function Settings() {
 
       {tab === "criteria" && (
         <div className="space-y-3 max-w-lg">
-          {["title_allowlist", "title_denylist", "location_allowlist", "location_denylist"].map((field) => (
+          {["title_allowlist", "title_denylist"].map((field) => (
+            <div key={field}>
+              <label className="block text-xs text-[#888] mb-1">{field.replace(/_/g, " ")}</label>
+              <input defaultValue={(criteria[field] as string) || ""}
+                onBlur={(e) => update.mutate({ criteria: { ...criteria, [field]: e.target.value } })}
+                className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5]" />
+            </div>
+          ))}
+          <div>
+            <label className="block text-xs text-[#888] mb-2">seniority levels</label>
+            <TagChips
+              value={(criteria.seniority_allowlist as string[]) || []}
+              onChange={(v) => update.mutate({ criteria: { ...criteria, seniority_allowlist: v } })}
+              suggestions={SENIORITY_SUGGESTIONS}
+              color="blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[#888] mb-2">exclusion keywords</label>
+            <TagChips
+              value={(criteria.exclusion_keywords as string[]) || []}
+              onChange={(v) => update.mutate({ criteria: { ...criteria, exclusion_keywords: v } })}
+              color="red"
+            />
+          </div>
+          {["location_allowlist", "location_denylist"].map((field) => (
             <div key={field}>
               <label className="block text-xs text-[#888] mb-1">{field.replace(/_/g, " ")}</label>
               <input defaultValue={(criteria[field] as string) || ""}
