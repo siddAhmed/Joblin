@@ -20,9 +20,11 @@ function TrackButtons({
 }) {
   const qc = useQueryClient();
   const tracked = trackerMap.get(match.job_id);
+  const [pendingApply, setPendingApply] = useState(false);
+  const [appliedDate, setAppliedDate] = useState("");
 
   const track = useMutation({
-    mutationFn: (status: ApplicationStatus) =>
+    mutationFn: ({ status, date }: { status: ApplicationStatus; date?: string }) =>
       applicationsApi.create({
         job_id: match.job_id,
         company_name: match.company_name,
@@ -31,8 +33,9 @@ function TrackButtons({
         status,
         source: "joblin",
         score: match.score,
+        applied_date: date || undefined,
       }),
-    onSuccess: (_data, status) => {
+    onSuccess: (_data, { status }) => {
       qc.invalidateQueries({ queryKey: ["applications"] });
       if (status === "applied") onApplied?.();
     },
@@ -44,6 +47,17 @@ function TrackButtons({
     tracked?.status === "rejected" ||
     tracked?.status === "offer";
 
+  const handleApplyClick = () => {
+    if (isApplied) return;
+    setAppliedDate(new Date().toISOString().split("T")[0]);
+    setPendingApply(true);
+  };
+
+  const confirmApply = () => {
+    track.mutate({ status: "applied", date: appliedDate || undefined });
+    setPendingApply(false);
+  };
+
   return (
     <>
       <button
@@ -52,22 +66,46 @@ function TrackButtons({
             ? "bg-purple-900/40 border-purple-800/60 text-purple-400"
             : "border-[#1e1e1e] text-[#666] hover:text-purple-400 hover:border-purple-900/60"
         }`}
-        onClick={() => { if (!isInterested) track.mutate("interested"); }}
+        onClick={() => { if (!isInterested) track.mutate({ status: "interested" }); }}
         disabled={track.isPending}
       >
         ★ Interested
       </button>
+      {pendingApply ? (
+        <span className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={appliedDate}
+            onChange={(e) => setAppliedDate(e.target.value)}
+            className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-[#ccc] [color-scheme:dark]"
+          />
+          <button
+            onClick={confirmApply}
+            disabled={track.isPending}
+            className="text-xs px-2 py-1 border border-blue-800/60 rounded text-blue-400 hover:bg-blue-900/20"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => setPendingApply(false)}
+            className="text-xs text-[#555] hover:text-[#888]"
+          >
+            ✕
+          </button>
+        </span>
+      ) : (
       <button
         className={`text-xs px-3 py-1.5 border rounded-md transition-colors ${
           isApplied
             ? "bg-blue-900/40 border-blue-800/60 text-blue-400"
             : "border-[#1e1e1e] text-[#666] hover:text-blue-400 hover:border-blue-900/60"
         }`}
-        onClick={() => { if (!isApplied) track.mutate("applied"); }}
+        onClick={handleApplyClick}
         disabled={track.isPending}
       >
         ✓ Applied
       </button>
+      )}
     </>
   );
 }
