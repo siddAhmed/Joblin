@@ -68,7 +68,7 @@ async def bulk_notify(req: BulkNotifyRequest, session: Session, current_user: Cu
 
     for match_id in req.match_ids:
         match = await session.get(Match, match_id)
-        if not match or match.is_preview:
+        if not match or match.is_preview or match.hidden_at:
             continue
         job = await session.get(Job, match.job_id)
         if not job or job.user_id != current_user.id:
@@ -103,7 +103,8 @@ async def dismiss_match(match_id: int, session: Session, current_user: CurrentUs
     match = (await session.execute(
         select(Match)
         .join(Job, Match.job_id == Job.id)
-        .where(Match.id == match_id, Job.user_id == current_user.id)
+        .join(Company, Job.company_id == Company.id)
+        .where(Match.id == match_id, Company.user_id == current_user.id)
     )).scalar_one_or_none()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")

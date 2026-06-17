@@ -19,7 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('matches', sa.Column('hidden_at', sa.DateTime(), nullable=True))
+    from sqlalchemy import text
+    conn = op.get_bind()
+    existing = {row[1] for row in conn.execute(text("PRAGMA table_info(matches)")).fetchall()}
+    if "hidden_at" not in existing:
+        op.add_column("matches", sa.Column("hidden_at", sa.DateTime(), nullable=True))
 
 
 def downgrade() -> None:

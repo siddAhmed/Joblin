@@ -233,9 +233,11 @@ export function Matches() {
               className="text-xs px-3 py-1 border border-[#1e1e1e] rounded text-[#666] hover:text-red-400 hover:border-red-900/60"
               onClick={() => {
                 const toDismiss = matches.filter((m) => selected.has(m.id));
-                Promise.all(toDismiss.map((m) => matchesApi.dismiss(m.id)))
-                  .then(() => qc.invalidateQueries({ queryKey: ["matches"] }))
-                  .catch(() => {});
+                Promise.allSettled(toDismiss.map((m) => matchesApi.dismiss(m.id)))
+                  .then(() => {
+                    setSelected(new Set());
+                    qc.invalidateQueries({ queryKey: ["matches"] });
+                  });
               }}
             >
               ✕ Dismiss
