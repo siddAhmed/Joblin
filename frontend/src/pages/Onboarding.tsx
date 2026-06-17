@@ -4,6 +4,7 @@ import { settingsApi } from "@/api/settings";
 import { companiesApi } from "@/api/companies";
 import type { DefaultCompany } from "@/api/companies";
 import { runsApi } from "@/api/runs";
+import { TagChips } from "@/components/TagChips";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -15,6 +16,33 @@ interface Preset {
   criteria: Record<string, unknown>;
 }
 
+interface CriteriaValues {
+  title_allowlist: string;
+  title_denylist: string;
+  location_allowlist: string;
+  location_denylist: string;
+  seniority_allowlist: string[];
+  exclusion_keywords: string[];
+  profile_description: string;
+}
+
+const SENIORITY_SUGGESTIONS = [
+  "Senior", "Staff", "Principal", "Lead", "Mid",
+  "Junior", "Intern", "New Grad", "Associate", "Entry Level",
+];
+
+function toCriteriaValues(raw: Record<string, unknown>): CriteriaValues {
+  return {
+    title_allowlist: (raw.title_allowlist as string) ?? "",
+    title_denylist: (raw.title_denylist as string) ?? "",
+    location_allowlist: (raw.location_allowlist as string) ?? "",
+    location_denylist: (raw.location_denylist as string) ?? "",
+    seniority_allowlist: (raw.seniority_allowlist as string[]) ?? [],
+    exclusion_keywords: (raw.exclusion_keywords as string[]) ?? [],
+    profile_description: (raw.profile_description as string) ?? "",
+  };
+}
+
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>(1);
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -23,6 +51,9 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [search, setSearch] = useState("");
   const [deselected, setDeselected] = useState<Set<string>>(new Set());
   const [stage, setStage] = useState<"experienced" | "intern" | null>(null);
+  const [criteria, setCriteria] = useState<CriteriaValues | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const qc = useQueryClient();
 
   const { data: defaultCompanies = [] } = useQuery<DefaultCompany[]>({
@@ -61,8 +92,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     onSuccess: () => setStep(2),
   });
 
-  const applyPreset = useMutation({
-    mutationFn: () => settingsApi.applyPreset(selectedPreset!),
+  const saveCriteria = useMutation({
+    mutationFn: (c: CriteriaValues) => settingsApi.update({ criteria: c }),
     onSuccess: () => setStep(3),
   });
 
@@ -141,7 +172,170 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             <div>
               <h2 className="text-sm font-semibold mb-3">Step 2: Choose a job criteria preset</h2>
 
-              {stage === null ? (
+              {editorOpen && criteria ? (
+                /* ── Sub-step C: Criteria editor ── */
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      onClick={() => setEditorOpen(false)}
+                      className="text-xs text-[#4e9eff] hover:underline"
+                    >
+                      ← Back
+                    </button>
+                    <span className="text-xs text-[#555]">
+                      {presets.find((p) => p.name === selectedPreset)?.label}
+                    </span>
+                  </div>
+
+                  {/* Importance banner */}
+                  <div className="bg-[#0e2040] border border-[#1e3a5f] rounded-lg p-3 mb-4">
+                    <div className="text-xs text-[#90c4ff] font-semibold mb-2">⚡ How Joblin filters jobs — two layers</div>
+                    <div className="space-y-2">
+                      <div className="bg-[#0a1a30] rounded p-2">
+                        <div className="text-[10px] text-[#f59e0b] font-semibold mb-1">Layer 1 — Heuristic filters (title, seniority, location, exclusions)</div>
+                        <div className="text-[10px] text-[#7aa3cc] leading-relaxed">Fast, non-AI rules. A job that fails is <span className="text-[#fbbf24]">dropped immediately</span> — the AI never sees it. If your patterns are too strict, you'll miss good matches with no warning.</div>
+                      </div>
+                      <div className="bg-[#0a1a30] rounded p-2">
+                        <div className="text-[10px] text-[#34d399] font-semibold mb-1">Layer 2 — AI scoring (profile description)</div>
+                        <div className="text-[10px] text-[#7aa3cc] leading-relaxed">Jobs that pass heuristics are scored by AI using your profile. Contextual and forgiving — a richer, more specific profile gives better, more relevant scores.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Title must match */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <label className="text-[10px] text-[#888] uppercase tracking-wider">Title must match</label>
+                      <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                    </div>
+                    <input
+                      value={criteria.title_allowlist}
+                      onChange={(e) => setCriteria({ ...criteria, title_allowlist: e.target.value })}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                    />
+                    <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Regex patterns, pipe-separated. Jobs whose title doesn't match any of these are discarded before AI scoring. Keep patterns broad — <span className="text-[#888]">"react" alone would miss "Frontend Engineer at Stripe"</span>.</p>
+                  </div>
+
+                  {/* Title must NOT match */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <label className="text-[10px] text-[#888] uppercase tracking-wider">Title must NOT match</label>
+                      <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                    </div>
+                    <input
+                      value={criteria.title_denylist}
+                      onChange={(e) => setCriteria({ ...criteria, title_denylist: e.target.value })}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                    />
+                    <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Jobs whose title matches any of these are discarded. Be precise — <span className="text-[#888]">"design" would also block "design systems engineer"</span>.</p>
+                  </div>
+
+                  {/* Seniority levels */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <label className="text-[10px] text-[#888] uppercase tracking-wider">Seniority levels</label>
+                      <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                    </div>
+                    <TagChips
+                      value={criteria.seniority_allowlist}
+                      onChange={(v) => setCriteria({ ...criteria, seniority_allowlist: v })}
+                      suggestions={SENIORITY_SUGGESTIONS}
+                      color="blue"
+                    />
+                    <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Inferred from the job title. <span className="text-[#888]">If seniority can't be inferred, the job passes through.</span> Leave all unchecked to skip this filter entirely.</p>
+                  </div>
+
+                  {/* Your profile */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <label className="text-[10px] text-[#888] uppercase tracking-wider">Your profile</label>
+                      <span className="text-[9px] bg-[#0a2010] border border-[#1a4a20] rounded px-1 py-px text-[#34d399]">AI scored</span>
+                      <span className="text-[9px] text-[#34d399]">← most impactful</span>
+                    </div>
+                    <textarea
+                      value={criteria.profile_description}
+                      onChange={(e) => setCriteria({ ...criteria, profile_description: e.target.value })}
+                      rows={3}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                    />
+                    <p className="text-[9px] text-[#555] mt-1 leading-relaxed">The AI reads this to score job relevance — it understands context, not just keywords. Include your tech stack, years of experience, what kind of company you want, and what you want to avoid. The more specific, the better your scores.</p>
+                  </div>
+
+                  {/* Advanced toggle */}
+                  <div className="border-t border-[#1a1a1a] pt-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="text-[10px] text-[#555] hover:text-[#888]"
+                    >
+                      {showAdvanced ? "▼" : "▶"} Advanced — location filters &amp; exclusion phrases
+                    </button>
+                    <p className="text-[9px] text-[#444] mt-1">These are also heuristic filters. Use them if you have specific geographic or content requirements.</p>
+                  </div>
+
+                  {showAdvanced && (
+                    <div className="space-y-3 mb-3">
+                      <div>
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <label className="text-[10px] text-[#888] uppercase tracking-wider">Location must match</label>
+                          <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                        </div>
+                        <input
+                          value={criteria.location_allowlist}
+                          onChange={(e) => setCriteria({ ...criteria, location_allowlist: e.target.value })}
+                          placeholder="e.g. remote|new york|london"
+                          className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                        />
+                        <p className="text-[9px] text-[#555] mt-1">Regex patterns. Leave blank to accept any location.</p>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <label className="text-[10px] text-[#888] uppercase tracking-wider">Location must NOT match</label>
+                          <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                        </div>
+                        <input
+                          value={criteria.location_denylist}
+                          onChange={(e) => setCriteria({ ...criteria, location_denylist: e.target.value })}
+                          className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                        />
+                        <p className="text-[9px] text-[#555] mt-1">Jobs in matching locations are discarded.</p>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <label className="text-[10px] text-[#888] uppercase tracking-wider">Exclusion keywords</label>
+                          <span className="text-[9px] bg-[#1a1200] border border-[#3a2a00] rounded px-1 py-px text-[#f59e0b]">heuristic</span>
+                        </div>
+                        <TagChips
+                          value={criteria.exclusion_keywords}
+                          onChange={(v) => setCriteria({ ...criteria, exclusion_keywords: v })}
+                          color="red"
+                        />
+                        <p className="text-[9px] text-[#555] mt-1">Jobs containing any of these exact phrases are discarded. Useful for filtering out visa-restricted or on-site-only postings.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => saveCriteria.mutate(criteria)}
+                      disabled={saveCriteria.isPending}
+                      className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
+                    >
+                      {saveCriteria.isPending ? "Saving..." : "Apply and continue"}
+                    </button>
+                    <button
+                      onClick={() => saveCriteria.mutate(criteria)}
+                      disabled={saveCriteria.isPending}
+                      className="text-xs text-[#555] hover:text-[#888]"
+                    >
+                      Skip customisation
+                    </button>
+                  </div>
+                </div>
+
+              ) : stage === null ? (
+                /* ── Sub-step A: Stage picker (unchanged) ── */
                 <>
                   <p className="text-xs text-[#666] mb-3">What stage are you at?</p>
                   <div className="space-y-2 mb-4">
@@ -161,11 +355,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }} className="text-xs text-[#555] hover:text-[#888]">
+                  <button
+                    onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }}
+                    className="text-xs text-[#555] hover:text-[#888]"
+                  >
                     Skip
                   </button>
                 </>
+
               ) : (
+                /* ── Sub-step B: Preset picker ── */
                 <>
                   <div className="flex items-center gap-2 mb-3">
                     <button
@@ -191,7 +390,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                         .map((p) => (
                           <button
                             key={p.name}
-                            onClick={() => setSelectedPreset(p.name)}
+                            onClick={() => {
+                              setSelectedPreset(p.name);
+                              setCriteria(toCriteriaValues(p.criteria as Record<string, unknown>));
+                            }}
                             className={`w-full text-left border rounded-lg px-4 py-3 transition-colors ${
                               selectedPreset === p.name
                                 ? "border-[#4e9eff] bg-[#0e2040]"
@@ -206,13 +408,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => applyPreset.mutate()}
-                      disabled={!selectedPreset || applyPreset.isPending}
+                      onClick={() => setEditorOpen(true)}
+                      disabled={!selectedPreset}
                       className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
                     >
-                      {applyPreset.isPending ? "Applying..." : "Apply and continue"}
+                      Customize and continue
                     </button>
-                    <button onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }} className="text-xs text-[#555] hover:text-[#888]">
+                    <button
+                      onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }}
+                      className="text-xs text-[#555] hover:text-[#888]"
+                    >
                       Skip
                     </button>
                   </div>
