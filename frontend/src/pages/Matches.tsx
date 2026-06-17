@@ -92,6 +92,10 @@ function MatchRow({
   const qc = useQueryClient();
   const applyUrl = match.job_url || job?.url;
   const dismiss = useMutation({ mutationFn: () => jobsApi.dismiss(match.job_id), onSuccess: () => qc.invalidateQueries({ queryKey: ["matches"] }) });
+  const hideMatch = useMutation({
+    mutationFn: () => matchesApi.dismiss(match.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["matches"] }),
+  });
 
   const isStrong = match.tier === "strong";
   return (
@@ -121,6 +125,13 @@ function MatchRow({
             </details>
           )}
           <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => hideMatch.mutate()}
+              disabled={hideMatch.isPending}
+              className="text-[11px] border border-[#2a2a2a] rounded px-2 py-1 text-[#888] hover:text-red-400"
+            >
+              Dismiss
+            </button>
             <button onClick={() => dismiss.mutate()} className="text-[11px] border border-[#2a2a2a] rounded px-2 py-1 text-[#888] hover:text-[#ccc]">Not interested</button>
             {applyUrl && (
               <a
@@ -222,7 +233,7 @@ export function Matches() {
               className="text-xs px-3 py-1 border border-[#1e1e1e] rounded text-[#666] hover:text-red-400 hover:border-red-900/60"
               onClick={() => {
                 const toDismiss = matches.filter((m) => selected.has(m.id));
-                Promise.all(toDismiss.map((m) => jobsApi.dismiss(m.job_id)))
+                Promise.all(toDismiss.map((m) => matchesApi.dismiss(m.id)))
                   .then(() => qc.invalidateQueries({ queryKey: ["matches"] }))
                   .catch(() => {});
               }}

@@ -20,4 +20,5 @@ export const matchesApi = {
   list: (params?: { tier?: string; limit?: number; offset?: number }) =>
     api.get<Match[]>("/matches", { params }).then((r) => r.data),
   notify: (match_ids: number[]) => api.post("/matches/notify", { match_ids }).then((r) => r.data),
+  dismiss: (match_id: number) => api.post(`/matches/${match_id}/dismiss`).then((r) => r.data),
 };
