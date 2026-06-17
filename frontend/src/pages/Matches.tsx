@@ -78,6 +78,7 @@ function MatchRow({
   onSelect,
   trackerMap,
   autoExpand,
+  autoDismissOnApply,
 }: {
   match: Match;
   selected: boolean;
