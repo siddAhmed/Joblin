@@ -177,7 +177,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <button
-                      onClick={() => setEditorOpen(false)}
+                      onClick={() => { setEditorOpen(false); setShowAdvanced(false); }}
                       className="text-xs text-[#4e9eff] hover:underline"
                     >
                       ← Back
