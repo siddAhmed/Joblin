@@ -82,10 +82,11 @@ async def _scrape_phase(
     cache_hours: int,
     quarantine_threshold: int,
     session: AsyncSession,
-) -> dict[int, int]:
-    """Scrape companies, upsert raw_jobs. Returns {catalog_company_id: jobs_found count}."""
+) -> tuple[dict[int, int], dict[int, str]]:
+    """Scrape companies, upsert raw_jobs. Returns ({catalog_company_id: jobs_found count}, {catalog_company_id: error_message})."""
     now = datetime.now(timezone.utc)
     counts: dict[int, int] = {}
+    failed_ids: dict[int, str] = {}
 
     for company in catalog_companies:
         if not is_manual and company.last_scraped_at:
@@ -116,6 +117,7 @@ async def _scrape_phase(
             await session.commit()
             await _emit(run_id, "company_failed", {"company_id": company.id, "error": msg})
             counts[company.id] = 0
+            failed_ids[company.id] = msg
             continue
         except Exception as exc:
             company.quarantine_count += 1
@@ -125,6 +127,7 @@ async def _scrape_phase(
             await session.commit()
             await _emit(run_id, "company_failed", {"company_id": company.id, "error": str(exc)})
             counts[company.id] = 0
+            failed_ids[company.id] = str(exc)
             continue
 
         for sj in scraped:
@@ -164,7 +167,7 @@ async def _scrape_phase(
         await session.commit()
         counts[company.id] = len(scraped)
 
-    return counts
+    return counts, failed_ids
 
 
 async def _process_phase(
@@ -378,7 +381,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     })
 
     # Phase 1: scrape
-    scrape_counts = await _scrape_phase(
+    scrape_counts, failed = await _scrape_phase(
         run_id=run_id,
         catalog_companies=catalog_companies,
         is_manual=is_manual,
@@ -411,11 +414,18 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
 
     # Update run_company_results
     for cat in catalog_companies:
+        if cat.id in failed:
+            row_status = CompanyResultStatus.failed
+            row_error = failed[cat.id]
+        else:
+            row_status = CompanyResultStatus.done
+            row_error = None
         result_row = RunCompanyResult(
             run_id=run_id,
             company_id=cat.id,
-            status=CompanyResultStatus.done,
+            status=row_status,
             jobs_found=scrape_counts.get(cat.id, 0),
+            error_message=row_error,
         )
         session.add(result_row)
         await _emit(run_id, "company_done", {
