@@ -9,6 +9,7 @@ from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.models import Company, Match, Run
 from backend.models.job import Job
+from backend.models.setting import Setting
 
 router = APIRouter(tags=["system"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -76,4 +77,15 @@ async def onboarding_status(session: Session, current_user: CurrentUser):
     company_count = (await session.execute(
         select(func.count()).select_from(Company).where(Company.user_id == current_user.id)
     )).scalar_one()
-    return {"needs_onboarding": company_count == 0}
+
+    groq_row = (await session.execute(
+        select(Setting).where(Setting.user_id == current_user.id, Setting.key == "groq_api_key")
+    )).scalar_one_or_none()
+    cerebras_row = (await session.execute(
+        select(Setting).where(Setting.user_id == current_user.id, Setting.key == "cerebras_api_key")
+    )).scalar_one_or_none()
+
+    has_groq = bool(groq_row and groq_row.value)
+    has_cerebras = bool(cerebras_row and cerebras_row.value)
+
+    return {"needs_onboarding": company_count == 0 or not has_groq or not has_cerebras}
