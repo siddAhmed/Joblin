@@ -10,6 +10,8 @@ from backend.dependencies.auth import CurrentUser
 from backend.models import Company, Match, Run
 from backend.models.job import Job
 from backend.models.setting import Setting
+from backend.models.user_company import UserCompany
+from backend.models.company_catalog import CompanyCatalog
 
 router = APIRouter(tags=["system"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -25,7 +27,7 @@ async def stats(session: Session, current_user: CurrentUser):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
 
     total_companies = (await session.execute(
-        select(func.count()).select_from(Company).where(Company.user_id == current_user.id)
+        select(func.count()).select_from(UserCompany).where(UserCompany.user_id == current_user.id)
     )).scalar_one()
 
     total_jobs_in_db = (await session.execute(
@@ -49,9 +51,11 @@ async def stats(session: Session, current_user: CurrentUser):
     )).scalar_one()
 
     quarantine_count = (await session.execute(
-        select(func.count()).select_from(Company).where(
-            Company.user_id == current_user.id,
-            Company.quarantined_at.isnot(None),
+        select(func.count()).select_from(UserCompany)
+        .join(CompanyCatalog, UserCompany.catalog_id == CompanyCatalog.id)
+        .where(
+            UserCompany.user_id == current_user.id,
+            CompanyCatalog.quarantined_at.isnot(None),
         )
     )).scalar_one()
 
@@ -75,7 +79,7 @@ async def stats(session: Session, current_user: CurrentUser):
 @router.get("/onboarding-status")
 async def onboarding_status(session: Session, current_user: CurrentUser):
     company_count = (await session.execute(
-        select(func.count()).select_from(Company).where(Company.user_id == current_user.id)
+        select(func.count()).select_from(UserCompany).where(UserCompany.user_id == current_user.id)
     )).scalar_one()
 
     groq_row = (await session.execute(
