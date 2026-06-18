@@ -8,7 +8,7 @@ class FeedbackExample(Base):
     __tablename__ = "feedback_examples"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("jobs.id"), nullable=False)
+    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_jobs.id"), nullable=False)
     company_name: Mapped[str] = mapped_column(String, nullable=False)
     normalized_title: Mapped[str] = mapped_column(String, nullable=False)
     normalized_location: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -14,7 +14,7 @@ class Match(Base):
     __tablename__ = "matches"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("jobs.id"), nullable=False, unique=True)
+    job_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_jobs.id"), nullable=False, unique=True)
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("runs.id"), nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     tier: Mapped[MatchTier] = mapped_column(Enum(MatchTier), nullable=False)

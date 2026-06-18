@@ -23,7 +23,7 @@ class ApplicationTracking(Base):
     __table_args__ = (UniqueConstraint("job_id", name="uq_application_job_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    job_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("jobs.id"), nullable=True)
+    job_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("user_jobs.id"), nullable=True)
     company_name: Mapped[str] = mapped_column(String, nullable=False)
     job_title: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[str | None] = mapped_column(String, nullable=True)

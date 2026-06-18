@@ -42,7 +42,7 @@ class RunCompanyResult(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("runs.id"), nullable=False)
-    company_id: Mapped[int] = mapped_column(Integer, ForeignKey("companies.id"), nullable=False)
+    company_id: Mapped[int] = mapped_column(Integer, ForeignKey("company_catalog.id"), nullable=False)
     status: Mapped[CompanyResultStatus] = mapped_column(
         Enum(CompanyResultStatus), default=CompanyResultStatus.scraping
     )
