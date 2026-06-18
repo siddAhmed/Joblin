@@ -140,11 +140,25 @@ This phase is identical to today's processing logic, sourcing from `raw_jobs` in
 
 When a user adds a company by URL:
 
-1. Normalize the URL (lowercase domain, strip trailing slash, strip `www.`)
-2. Query `company_catalog` for a matching `careers_url`
-3. **Match found:** create `user_companies` entry linking to the existing catalog row
+1. Normalize the URL: lowercase domain, strip `www.`, strip `https?://`, strip trailing slash
+2. Query `company_catalog` for a matching normalized `careers_url`
+3. **Match found:** create `user_companies` entry linking to the existing catalog row (if not already linked)
 4. **No match:** create a new `company_catalog` row (`source='user_submitted'`), then create `user_companies` entry
 5. ATS discovery runs on the catalog entry — result is shared with any other user who later adds the same URL
+
+### API response — `match_status`
+
+The add-company endpoint returns a `match_status` field so the frontend can surface the right message to the user:
+
+| `match_status` | Condition | Suggested UI message |
+|----------------|-----------|----------------------|
+| `added_new` | New catalog entry created, ATS discovery queued | "Added — detecting ATS type..." |
+| `linked_existing_working` | Catalog entry exists, `discovery_status=success` | "Already in our catalog and working — added to your list" |
+| `linked_existing_pending` | Catalog entry exists, ATS not yet confirmed | "Already in our catalog (ATS detection pending) — added to your list" |
+| `linked_existing_quarantined` | Catalog entry exists but quarantined | "This company is in our catalog but currently quarantined due to scraping failures — added anyway" |
+| `already_in_your_list` | User already has a `user_companies` row for this catalog entry | "You're already monitoring this company" |
+
+URL normalization runs on both the submitted value and stored `careers_url` values before comparison, so `https://www.greenhouse.io/careers/google` and `http://greenhouse.io/careers/google` resolve to the same catalog entry.
 
 ---
 
