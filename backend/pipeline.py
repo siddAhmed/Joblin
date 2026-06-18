@@ -256,7 +256,6 @@ async def _process_phase(
             existing_uj.preview_only = False
             existing_uj.run_id = run_id
             user_job = existing_uj
-            await session.flush()
         else:
             user_job = UserJob(
                 user_id=user_id,
@@ -266,7 +265,10 @@ async def _process_phase(
                 preview_only=is_preview,
             )
             session.add(user_job)
-            await session.flush()
+
+        # Commit UserJob before any LLM calls so the write lock is released
+        # during slow I/O. expire_on_commit=False keeps user_job.id accessible.
+        await session.commit()
 
         if not passed:
             continue
@@ -281,10 +283,12 @@ async def _process_phase(
 
         if existing_match and existing_match.is_preview and not is_preview:
             existing_match.is_preview = False
+            await session.commit()
             confirmed_count += 1
             company_stats[cat_id][1] += 1
             continue
 
+        # LLM filter -- write lock is NOT held during this call
         try:
             filter_result = await filter_provider.filter(
                 title=raw_job.title,
@@ -306,10 +310,12 @@ async def _process_phase(
             ))
 
         if not filter_result or filter_result.score < 0.4:
+            await session.commit()  # persist TokenUsage before moving on
             continue
 
         tier = MatchTier.strong if filter_result.score >= 0.7 else MatchTier.borderline
 
+        # LLM summarize -- write lock is NOT held during this call
         try:
             summary = await summarize_provider.summarize(
                 title=raw_job.title, company_name=catalog_company.name,
@@ -341,7 +347,6 @@ async def _process_phase(
                 is_preview=is_preview,
             )
             session.add(match)
-            await session.flush()
 
         confirmed_count += 1
         company_stats[cat_id][1] += 1
@@ -365,7 +370,8 @@ async def _process_phase(
             except Exception:
                 pass
 
-    await session.commit()
+        await session.commit()  # persist Match + TokenUsage for this job
+
     company_stats_tuples: dict[int, tuple[int, int]] = {k: (v[0], v[1]) for k, v in company_stats.items()}
     return new_count, passed_count, confirmed_count, notified_count, company_stats_tuples
 
