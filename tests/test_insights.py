@@ -2,8 +2,10 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import AsyncMock, patch
 
-from backend.models.company import Company
-from backend.models.job import Job
+from backend.models.company import AtsType
+from backend.models.company_catalog import CompanyCatalog
+from backend.models.raw_job import RawJob
+from backend.models.user_job import UserJob
 from backend.models.match import Match, MatchTier
 from backend.models.run import Run, RunStatus
 from backend.models.job_skill import JobSkill
@@ -45,27 +47,34 @@ async def test_analyze_records_skills_and_deduplicates(client: AsyncClient, app)
         await conn.run_sync(Base.metadata.create_all)
 
     async with session_factory() as session:
-        company = Company(name="Acme", careers_url="https://acme.com/careers", ats_type="greenhouse", user_id=1)
-        session.add(company)
+        catalog = CompanyCatalog(
+            name="Acme",
+            careers_url="https://acme.com/careers",
+            ats_type=AtsType.greenhouse,
+        )
+        session.add(catalog)
         await session.flush()
 
-        job = Job(
-            company_id=company.id,
+        raw_job = RawJob(
+            catalog_company_id=catalog.id,
             job_id="j1",
             title="Backend Engineer",
             url="https://acme.com/jobs/1",
             raw_description="Python, PostgreSQL, system design required.",
             normalized_title="backend engineer",
-            user_id=1,
         )
-        session.add(job)
+        session.add(raw_job)
         await session.flush()
 
         run = Run(status=RunStatus.completed, user_id=1)
         session.add(run)
         await session.flush()
 
-        match = Match(job_id=job.id, run_id=run.id, score=0.85, tier=MatchTier.strong, summary="Good fit")
+        user_job = UserJob(user_id=1, raw_job_id=raw_job.id, run_id=run.id)
+        session.add(user_job)
+        await session.flush()
+
+        match = Match(job_id=user_job.id, run_id=run.id, score=0.85, tier=MatchTier.strong, summary="Good fit")
         session.add(match)
         await session.commit()
 

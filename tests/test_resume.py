@@ -3,8 +3,10 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.database import get_session
-from backend.models.company import Company, AtsType
-from backend.models.job import Job
+from backend.models.company import AtsType
+from backend.models.company_catalog import CompanyCatalog
+from backend.models.raw_job import RawJob
+from backend.models.user_job import UserJob
 
 
 async def test_get_resume_returns_404_when_none(client):
@@ -72,29 +74,30 @@ async def test_compile_resume_failure(client):
 @pytest.fixture
 async def seeded_job_id(app):
     override = app.dependency_overrides[get_session]
-    job_id = None
+    user_job_id = None
     async for session in override():
-        company = Company(
+        catalog = CompanyCatalog(
             name="Stripe",
             careers_url="https://stripe.com/jobs",
             ats_type=AtsType.greenhouse,
-            user_id=1,
         )
-        session.add(company)
+        session.add(catalog)
         await session.flush()
-        job = Job(
-            company_id=company.id,
+        raw_job = RawJob(
+            catalog_company_id=catalog.id,
             job_id="swe-123",
             title="Software Engineer",
             url="https://stripe.com/jobs/swe-123",
             raw_description="Python, distributed systems, REST APIs, PostgreSQL",
             normalized_title="software engineer",
-            user_id=1,
         )
-        session.add(job)
+        session.add(raw_job)
+        await session.flush()
+        user_job = UserJob(user_id=1, raw_job_id=raw_job.id)
+        session.add(user_job)
         await session.commit()
-        job_id = job.id
-    return job_id
+        user_job_id = user_job.id
+    return user_job_id
 
 
 async def test_tailor_resume_404_no_resume(client):

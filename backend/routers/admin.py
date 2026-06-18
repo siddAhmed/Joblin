@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.models.feedback import FeedbackExample
-from backend.models.job import Job
 from backend.models.match import Match
 from backend.models.run import Run, RunCompanyResult
+from backend.models.user_job import UserJob
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -20,7 +20,7 @@ async def reset_job_data(session: Session, current_user: CurrentUser):
     counts = {}
 
     user_job_ids = (await session.execute(
-        select(Job.id).where(Job.user_id == current_user.id)
+        select(UserJob.id).where(UserJob.user_id == current_user.id)
     )).scalars().all()
 
     counts["feedback_examples"] = (await session.execute(
@@ -43,7 +43,7 @@ async def reset_job_data(session: Session, current_user: CurrentUser):
     await session.execute(delete(RunCompanyResult).where(RunCompanyResult.run_id.in_(user_run_ids)))
 
     counts["jobs"] = len(user_job_ids)
-    await session.execute(delete(Job).where(Job.user_id == current_user.id))
+    await session.execute(delete(UserJob).where(UserJob.user_id == current_user.id))
 
     counts["runs"] = len(user_run_ids)
     await session.execute(delete(Run).where(Run.user_id == current_user.id))

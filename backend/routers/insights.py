@@ -10,8 +10,9 @@ from backend.config import get_all_settings
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.llm.factory import get_filter_provider
-from backend.models.company import Company
-from backend.models.job import Job
+from backend.models.raw_job import RawJob
+from backend.models.user_job import UserJob
+from backend.models.company_catalog import CompanyCatalog
 from backend.models.job_skill import JobSkill
 from backend.models.match import Match
 
@@ -37,19 +38,24 @@ async def analyze_skills(req: AnalyzeRequest, session: Session, current_user: Cu
         if not match:
             continue
 
-        job = await session.get(Job, match.job_id)
-        if not job or job.user_id != current_user.id:
+        row = (await session.execute(
+            select(UserJob, RawJob)
+            .join(RawJob, UserJob.raw_job_id == RawJob.id)
+            .where(UserJob.id == match.job_id, UserJob.user_id == current_user.id)
+        )).one_or_none()
+        if not row:
             continue
+        uj, rj = row
 
         existing = (await session.execute(
-            select(func.count()).select_from(JobSkill).where(JobSkill.job_id == job.id)
+            select(func.count()).select_from(JobSkill).where(JobSkill.job_id == uj.id)
         )).scalar() or 0
         if existing > 0:
             skipped += 1
             continue
 
         try:
-            skills = await provider.extract_skills(job.title, job.raw_description)
+            skills = await provider.extract_skills(rj.title, rj.raw_description)
         except Exception:
             continue
 
@@ -57,7 +63,7 @@ async def analyze_skills(req: AnalyzeRequest, session: Session, current_user: Cu
             if not isinstance(skill, str) or not skill.strip():
                 continue
             stmt = sqlite_insert(JobSkill).values(
-                job_id=job.id, skill_name=skill.strip()
+                job_id=uj.id, skill_name=skill.strip()
             ).on_conflict_do_nothing()
             await session.execute(stmt)
             skills_found += 1
@@ -72,16 +78,16 @@ async def analyze_skills(req: AnalyzeRequest, session: Session, current_user: Cu
 async def list_skills(session: Session, current_user: CurrentUser):
     rows = (await session.execute(
         select(JobSkill.skill_name, func.count(JobSkill.id).label("count"))
-        .join(Job, JobSkill.job_id == Job.id)
-        .where(Job.user_id == current_user.id)
+        .join(UserJob, JobSkill.job_id == UserJob.id)
+        .where(UserJob.user_id == current_user.id)
         .group_by(JobSkill.skill_name)
         .order_by(func.count(JobSkill.id).desc())
     )).all()
 
     total_jobs = (await session.execute(
         select(func.count(func.distinct(JobSkill.job_id)))
-        .join(Job, JobSkill.job_id == Job.id)
-        .where(Job.user_id == current_user.id)
+        .join(UserJob, JobSkill.job_id == UserJob.id)
+        .where(UserJob.user_id == current_user.id)
     )).scalar() or 0
 
     return {
@@ -93,11 +99,12 @@ async def list_skills(session: Session, current_user: CurrentUser):
 @router.get("/skills/{name}/citations")
 async def get_citations(name: str, session: Session, current_user: CurrentUser):
     rows = (await session.execute(
-        select(Company.name.label("company_name"), Job.title.label("job_title"))
+        select(CompanyCatalog.name.label("company_name"), RawJob.title.label("job_title"))
         .select_from(JobSkill)
-        .join(Job, JobSkill.job_id == Job.id)
-        .join(Company, Job.company_id == Company.id)
-        .where(JobSkill.skill_name == name, Company.user_id == current_user.id)
+        .join(UserJob, JobSkill.job_id == UserJob.id)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .join(CompanyCatalog, RawJob.catalog_company_id == CompanyCatalog.id)
+        .where(JobSkill.skill_name == name, UserJob.user_id == current_user.id)
         .order_by(JobSkill.created_at.desc())
     )).all()
     return [{"company_name": row.company_name, "job_title": row.job_title} for row in rows]

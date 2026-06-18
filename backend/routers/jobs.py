@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
-from backend.models.job import Job
+from backend.models.raw_job import RawJob
+from backend.models.user_job import UserJob
+from backend.models.company_catalog import CompanyCatalog
 from backend.models.match import Match
-from backend.models.company import Company
 from backend.models.feedback import FeedbackExample
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -25,48 +26,59 @@ async def list_jobs(
     limit: int = Query(50, le=200),
     offset: int = Query(0),
 ):
-    stmt = select(Job).where(Job.user_id == current_user.id).order_by(Job.first_seen_at.desc())
+    stmt = (
+        select(UserJob, RawJob)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .where(UserJob.user_id == current_user.id)
+        .order_by(UserJob.first_seen_at.desc())
+    )
     if company_id:
-        stmt = stmt.where(Job.company_id == company_id)
+        stmt = stmt.where(RawJob.catalog_company_id == company_id)
     if search:
-        stmt = stmt.where(Job.title.ilike(f"%{search}%"))
+        stmt = stmt.where(RawJob.title.ilike(f"%{search}%"))
     stmt = stmt.offset(offset).limit(limit)
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = (await session.execute(stmt)).all()
     return [
         {
-            "id": j.id, "company_id": j.company_id, "title": j.title,
-            "location": j.location, "url": j.url,
-            "first_seen_at": j.first_seen_at, "is_active": j.is_active,
+            "id": uj.id, "company_id": rj.catalog_company_id, "title": rj.title,
+            "location": rj.location, "url": rj.url,
+            "first_seen_at": uj.first_seen_at, "is_active": rj.is_active,
         }
-        for j in rows
+        for uj, rj in rows
     ]
 
 
 @router.get("/{job_id}")
 async def get_job(job_id: int, session: Session, current_user: CurrentUser):
-    job = (await session.execute(
-        select(Job).where(Job.id == job_id, Job.user_id == current_user.id)
-    )).scalar_one_or_none()
-    if not job:
+    row = (await session.execute(
+        select(UserJob, RawJob)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .where(UserJob.id == job_id, UserJob.user_id == current_user.id)
+    )).one_or_none()
+    if not row:
         raise HTTPException(status_code=404, detail="Job not found")
+    uj, rj = row
     match = (await session.execute(
         select(Match).where(Match.job_id == job_id)
     )).scalar_one_or_none()
     return {
-        "id": job.id, "title": job.title, "company_id": job.company_id,
-        "location": job.location, "url": job.url,
-        "raw_description": job.raw_description,
+        "id": uj.id, "title": rj.title, "company_id": rj.catalog_company_id,
+        "location": rj.location, "url": rj.url,
+        "raw_description": rj.raw_description,
         "match": {"score": match.score, "tier": match.tier, "summary": match.summary} if match else None,
     }
 
 
 @router.post("/{job_id}/dismiss")
 async def dismiss_job(job_id: int, session: Session, current_user: CurrentUser):
-    job = (await session.execute(
-        select(Job).where(Job.id == job_id, Job.user_id == current_user.id)
-    )).scalar_one_or_none()
-    if not job:
+    row = (await session.execute(
+        select(UserJob, RawJob)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .where(UserJob.id == job_id, UserJob.user_id == current_user.id)
+    )).one_or_none()
+    if not row:
         raise HTTPException(status_code=404, detail="Job not found")
+    uj, rj = row
 
     match = (await session.execute(
         select(Match).where(Match.job_id == job_id)
@@ -76,12 +88,12 @@ async def dismiss_job(job_id: int, session: Session, current_user: CurrentUser):
 
     match.not_interested_at = datetime.now(timezone.utc)
 
-    company = await session.get(Company, job.company_id)
+    catalog = await session.get(CompanyCatalog, rj.catalog_company_id)
     fb = FeedbackExample(
         job_id=job_id,
-        company_name=company.name if company else "",
-        normalized_title=job.normalized_title,
-        normalized_location=job.normalized_location,
+        company_name=catalog.name if catalog else "",
+        normalized_title=rj.normalized_title,
+        normalized_location=rj.normalized_location,
         summary=match.summary,
         user_id=current_user.id,
     )

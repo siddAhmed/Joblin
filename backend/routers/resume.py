@@ -14,7 +14,8 @@ from backend.config import get_all_settings
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.llm.factory import get_tailor_provider
-from backend.models.job import Job
+from backend.models.user_job import UserJob
+from backend.models.raw_job import RawJob
 from backend.models.resume import Resume
 
 router = APIRouter(prefix="/resume", tags=["resume"])
@@ -92,21 +93,24 @@ async def tailor_resume_endpoint(body: TailorRequest, session: Session, current_
     if resume is None:
         raise HTTPException(status_code=404, detail="No reference resume found. Upload a .tex file first.")
 
-    job = (await session.execute(
-        select(Job).where(Job.id == body.job_id, Job.user_id == current_user.id)
-    )).scalar_one_or_none()
-    if job is None:
+    row = (await session.execute(
+        select(UserJob, RawJob)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .where(UserJob.id == body.job_id, UserJob.user_id == current_user.id)
+    )).one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    uj, rj = row
 
     settings = await get_all_settings(session, user_id=current_user.id)
     provider = get_tailor_provider(settings)
-    if not job.raw_description:
+    if not rj.raw_description:
         raise HTTPException(
             status_code=422,
             detail="This job has no description yet. Run a scan to fetch full job details first.",
         )
     tailored_tex = await provider.tailor_resume(
         tex_content=resume.tex_content,
-        job_description=job.raw_description,
+        job_description=rj.raw_description,
     )
     return {"tex_content": tailored_tex}

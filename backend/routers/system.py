@@ -7,11 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
-from backend.models import Company, Match, Run
-from backend.models.job import Job
+from backend.models import Match, Run
 from backend.models.setting import Setting
 from backend.models.user_company import UserCompany
 from backend.models.company_catalog import CompanyCatalog
+from backend.models.user_job import UserJob
 
 router = APIRouter(tags=["system"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -31,20 +31,20 @@ async def stats(session: Session, current_user: CurrentUser):
     )).scalar_one()
 
     total_jobs_in_db = (await session.execute(
-        select(func.count()).select_from(Job).where(Job.user_id == current_user.id)
+        select(func.count()).select_from(UserJob).where(UserJob.user_id == current_user.id)
     )).scalar_one()
 
     todays_matches = (await session.execute(
         select(func.count()).select_from(Match)
-        .join(Job, Match.job_id == Job.id)
-        .where(Job.user_id == current_user.id, Match.created_at >= today_start)
+        .join(UserJob, Match.job_id == UserJob.id)
+        .where(UserJob.user_id == current_user.id, Match.created_at >= today_start)
     )).scalar_one()
 
     strong_today = (await session.execute(
         select(func.count()).select_from(Match)
-        .join(Job, Match.job_id == Job.id)
+        .join(UserJob, Match.job_id == UserJob.id)
         .where(
-            Job.user_id == current_user.id,
+            UserJob.user_id == current_user.id,
             Match.created_at >= today_start,
             Match.tier == "strong",
         )

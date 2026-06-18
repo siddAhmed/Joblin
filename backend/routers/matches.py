@@ -11,8 +11,9 @@ from backend.database import get_session
 from backend.dependencies.auth import CurrentUser
 from backend.discord import post_match_to_discord
 from backend.models.match import Match
-from backend.models.job import Job
-from backend.models.company import Company
+from backend.models.raw_job import RawJob
+from backend.models.user_job import UserJob
+from backend.models.company_catalog import CompanyCatalog
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -28,17 +29,18 @@ async def list_matches(
     offset: int = Query(0),
 ):
     stmt = (
-        select(Match, Job, Company)
-        .join(Job, Match.job_id == Job.id)
-        .join(Company, Job.company_id == Company.id)
-        .where(Company.user_id == current_user.id)
+        select(Match, UserJob, RawJob, CompanyCatalog)
+        .join(UserJob, Match.job_id == UserJob.id)
+        .join(RawJob, UserJob.raw_job_id == RawJob.id)
+        .join(CompanyCatalog, RawJob.catalog_company_id == CompanyCatalog.id)
+        .where(UserJob.user_id == current_user.id)
         .where(Match.hidden_at == None)
         .order_by(Match.created_at.desc())
     )
     if tier:
         stmt = stmt.where(Match.tier == tier)
     if company_id:
-        stmt = stmt.where(Company.id == company_id)
+        stmt = stmt.where(RawJob.catalog_company_id == company_id)
     stmt = stmt.offset(offset).limit(limit)
     rows = (await session.execute(stmt)).all()
     return [
@@ -47,12 +49,12 @@ async def list_matches(
             "summary": m.summary, "is_preview": m.is_preview,
             "notified_at": m.notified_at, "not_interested_at": m.not_interested_at,
             "created_at": m.created_at,
-            "job_title": j.title,
-            "company_name": c.name,
-            "location": j.location,
-            "job_url": j.url,
+            "job_title": rj.title,
+            "company_name": cat.name,
+            "location": rj.location,
+            "job_url": rj.url,
         }
-        for m, j, c in rows
+        for m, uj, rj, cat in rows
     ]
 
 
@@ -70,22 +72,25 @@ async def bulk_notify(req: BulkNotifyRequest, session: Session, current_user: Cu
         match = await session.get(Match, match_id)
         if not match or match.is_preview or match.hidden_at:
             continue
-        job = await session.get(Job, match.job_id)
-        if not job or job.user_id != current_user.id:
+        row = (await session.execute(
+            select(UserJob, RawJob, CompanyCatalog)
+            .join(RawJob, UserJob.raw_job_id == RawJob.id)
+            .join(CompanyCatalog, RawJob.catalog_company_id == CompanyCatalog.id)
+            .where(UserJob.id == match.job_id, UserJob.user_id == current_user.id)
+        )).one_or_none()
+        if not row:
             continue
-        company = await session.get(Company, job.company_id) if job else None
-        if not company:
-            continue
+        uj, rj, cat = row
         try:
             await post_match_to_discord(
                 webhook_url=webhook_url,
-                title=job.title,
-                company_name=company.name,
-                location=job.location,
+                title=rj.title,
+                company_name=cat.name,
+                location=rj.location,
                 score=match.score,
                 tier=match.tier.value,
                 summary=match.summary,
-                job_url=job.url,
+                job_url=rj.url,
                 mention_type=settings.get("discord_mention_type", "none"),
                 mention_id=settings.get("discord_mention_id", ""),
             )
@@ -102,9 +107,8 @@ async def bulk_notify(req: BulkNotifyRequest, session: Session, current_user: Cu
 async def dismiss_match(match_id: int, session: Session, current_user: CurrentUser):
     match = (await session.execute(
         select(Match)
-        .join(Job, Match.job_id == Job.id)
-        .join(Company, Job.company_id == Company.id)
-        .where(Match.id == match_id, Company.user_id == current_user.id)
+        .join(UserJob, Match.job_id == UserJob.id)
+        .where(Match.id == match_id, UserJob.user_id == current_user.id)
     )).scalar_one_or_none()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
