@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func, delete
@@ -356,15 +358,23 @@ async def discover_companies(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    from backend.data.default_companies import DEFAULT_COMPANIES
-    name_to_url = {c["name"].lower(): c["careers_url"] for c in DEFAULT_COMPANIES}
+    from backend.scrapers.discover import discover_company
+    from backend.models.company import AtsType
+
     created = 0
     ids = []
     for name in body.names:
-        careers_url = name_to_url.get(name.lower())
-        if not careers_url:
+        name = name.strip()
+        if not name:
             continue
-        existing_cat = await _find_catalog_by_url(careers_url, session)
+
+        # If already in catalog, just link or skip
+        existing_cat = (await session.execute(
+            select(CompanyCatalog).where(
+                CompanyCatalog.name.ilike(name)
+            )
+        )).scalar_one_or_none()
+
         if existing_cat:
             existing_uc = (await session.execute(
                 select(UserCompany).where(
@@ -379,21 +389,27 @@ async def discover_companies(
                 ids.append(uc.id)
                 created += 1
             continue
-        probe_result = await probe_ats(careers_url=careers_url, name_hint=name)
-        from backend.models.company import AtsType
-        try:
-            ats_enum = AtsType(probe_result.ats_type)
-        except ValueError:
-            ats_enum = AtsType.crawl4ai
-        cat = CompanyCatalog(name=name, careers_url=careers_url, ats_type=ats_enum,
-                             ats_identifier=probe_result.identifier, source="default")
+
+        # New company: create catalog entry in "discovering" state, fire background task
+        cat = CompanyCatalog(
+            name=name,
+            careers_url="",
+            ats_type=AtsType.crawl4ai,
+            source="user_submitted",
+            discovery_status="discovering",
+            discovery_message="Starting discovery...",
+        )
         session.add(cat)
         await session.flush()
-        uc = UserCompany(user_id=current_user.id, catalog_id=cat.id, is_active=True)
+
+        uc = UserCompany(user_id=current_user.id, catalog_id=cat.id, is_active=False)
         session.add(uc)
         await session.flush()
         ids.append(uc.id)
         created += 1
+
+        catalog_id = cat.id
+        asyncio.create_task(discover_company(catalog_id, name))
 
     await session.commit()
     return {"created": created, "ids": ids}

@@ -13,7 +13,8 @@ except ModuleNotFoundError:
 
 from backend.data.default_companies import DEFAULT_COMPANIES
 from backend.database import AsyncSessionLocal
-from backend.models.company import AtsType, Company
+from backend.models.company import AtsType
+from backend.models.company_catalog import CompanyCatalog
 from backend.scrapers.probe import ProbeResult, probe_ats
 
 
@@ -103,35 +104,34 @@ async def _llm_analyze_page(
     return None
 
 
-async def _update_status(company_id: int, message: str, status: str = "discovering") -> None:
+async def _update_status(catalog_id: int, message: str, status: str = "discovering") -> None:
     async with AsyncSessionLocal() as session:
-        company = (await session.execute(
-            select(Company).where(Company.id == company_id)
-        )).scalar_one_or_none()
-        if company:
-            company.discovery_message = message
-            company.discovery_status = status
+        cat = await session.get(CompanyCatalog, catalog_id)
+        if cat:
+            cat.discovery_message = message
+            cat.discovery_status = status
             await session.commit()
 
 
 async def _resolve(
-    company_id: int, ats_type: str, identifier: str | None, careers_url: str
+    catalog_id: int, ats_type: str, identifier: str | None, careers_url: str
 ) -> None:
     async with AsyncSessionLocal() as session:
-        company = (await session.execute(
-            select(Company).where(Company.id == company_id)
-        )).scalar_one_or_none()
-        if company:
-            company.ats_type = AtsType(ats_type)
-            company.ats_identifier = identifier
-            company.careers_url = careers_url
-            company.discovery_status = "none"
-            company.discovery_message = None
-            company.is_active = True
+        cat = await session.get(CompanyCatalog, catalog_id)
+        if cat:
+            try:
+                cat.ats_type = AtsType(ats_type)
+            except ValueError:
+                cat.ats_type = AtsType.crawl4ai
+            cat.ats_identifier = identifier
+            cat.careers_url = careers_url
+            cat.discovery_status = "none"
+            cat.discovery_message = None
+            cat.is_active = True
             await session.commit()
 
 
-async def _run_discovery(company_id: int, name: str) -> None:
+async def _run_discovery(catalog_id: int, name: str) -> None:
     client = anthropic.AsyncAnthropic()
 
     # Step 1: Catalog fast path
@@ -139,27 +139,27 @@ async def _run_discovery(company_id: int, name: str) -> None:
         (c for c in DEFAULT_COMPANIES if c["name"].lower() == name.lower()), None
     )
     if catalog_entry:
-        await _update_status(company_id, "Probing known URL...")
+        await _update_status(catalog_id, "Probing known URL...")
         result = await probe_ats(catalog_entry["careers_url"], name)
-        await _resolve(company_id, result.ats_type, result.identifier, catalog_entry["careers_url"])
+        await _resolve(catalog_id, result.ats_type, result.identifier, catalog_entry["careers_url"])
         return
 
     # Step 2: Web search + heuristics (up to 10 candidates)
-    await _update_status(company_id, "Searching web...")
+    await _update_status(catalog_id, "Searching web...")
     search_urls = await _search_web(name)
     heuristic_urls = _heuristic_candidates(name)
     all_candidates = list(dict.fromkeys(search_urls + heuristic_urls))[:10]
 
     if not all_candidates:
-        await _update_status(company_id, "Could not find — paste URL manually", "failed")
+        await _update_status(catalog_id, "Could not find — paste URL manually", "failed")
         return
 
     # Step 3: LLM pass 1 -- filter/rank candidates
-    await _update_status(company_id, "Filtering candidates...")
+    await _update_status(catalog_id, "Filtering candidates...")
     filtered = await _llm_filter(name, all_candidates, client)
 
     # Step 4: Parallel ATS probe all candidates
-    await _update_status(company_id, "Probing ATS APIs...")
+    await _update_status(catalog_id, "Probing ATS APIs...")
 
     async def probe_candidate(url: str) -> tuple[str, ProbeResult] | None:
         try:
@@ -176,7 +176,7 @@ async def _run_discovery(company_id: int, name: str) -> None:
             continue
         url, result = item
         if result.ats_type != "crawl4ai":
-            await _resolve(company_id, result.ats_type, result.identifier, url)
+            await _resolve(catalog_id, result.ats_type, result.identifier, url)
             return
         if best_crawl4ai_url is None:
             best_crawl4ai_url = url
@@ -184,7 +184,7 @@ async def _run_discovery(company_id: int, name: str) -> None:
     # Step 5: LLM pass 2 -- analyze the top-ranked page
     top_url = filtered[0] if filtered else best_crawl4ai_url
     if top_url:
-        await _update_status(company_id, "Analyzing careers page...")
+        await _update_status(catalog_id, "Analyzing careers page...")
         try:
             async with _AsyncWebCrawler(headless=True) as crawler:
                 crawl_result = await crawler.arun(url=top_url)
@@ -198,7 +198,7 @@ async def _run_discovery(company_id: int, name: str) -> None:
                     if reprobe.ats_type != "crawl4ai"
                     else analysis.get("ats_type", "crawl4ai")
                 )
-                await _resolve(company_id, resolved_ats, reprobe.identifier, careers_url)
+                await _resolve(catalog_id, resolved_ats, reprobe.identifier, careers_url)
                 return
         except Exception:
             pass
@@ -206,13 +206,13 @@ async def _run_discovery(company_id: int, name: str) -> None:
     # Step 6: Fallback
     fallback_url = best_crawl4ai_url or (filtered[0] if filtered else None)
     if fallback_url:
-        await _resolve(company_id, "crawl4ai", None, fallback_url)
+        await _resolve(catalog_id, "crawl4ai", None, fallback_url)
     else:
-        await _update_status(company_id, "Could not find — paste URL manually", "failed")
+        await _update_status(catalog_id, "Could not find — paste URL manually", "failed")
 
 
-async def discover_company(company_id: int, name: str) -> None:
+async def discover_company(catalog_id: int, name: str) -> None:
     try:
-        await asyncio.wait_for(_run_discovery(company_id, name), timeout=90.0)
+        await asyncio.wait_for(_run_discovery(catalog_id, name), timeout=90.0)
     except Exception:
-        await _update_status(company_id, "Could not find — paste URL manually", "failed")
+        await _update_status(catalog_id, "Could not find — paste URL manually", "failed")
