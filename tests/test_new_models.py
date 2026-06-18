@@ -121,3 +121,9 @@ async def test_migration_populates_catalog(app):
         assert len(count) == 1, "Two users with same URL should produce one catalog entry"
 
     await engine.dispose()
+
+
+async def test_global_cache_hours_default(client):
+    from backend.config import DEFAULTS
+    assert "global_scrape_cache_hours" in DEFAULTS
+    assert DEFAULTS["global_scrape_cache_hours"] == 2

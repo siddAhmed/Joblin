@@ -30,6 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "schedule_interval_unit": "hours",
     "staleness_threshold_hours": 4,
     "quarantine_threshold": 3,
+    "global_scrape_cache_hours": 2,
     "groq_api_key": os.getenv("GROQ_API_KEY", ""),
     "cerebras_api_key": os.getenv("CEREBRAS_API_KEY", ""),
     "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
