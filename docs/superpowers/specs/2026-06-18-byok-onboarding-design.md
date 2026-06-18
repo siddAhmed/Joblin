@@ -38,7 +38,7 @@ return {"needs_onboarding": needs_onboarding}
 
 This means a user with companies but missing keys (degraded state) is also sent back through full onboarding starting at Step 1.
 
-The admin user (user 1) is unaffected because `seed_defaults` writes keys from env on startup.
+The admin user (user 1) is unaffected if `GROQ_API_KEY` and `CEREBRAS_API_KEY` env vars are set — `seed_defaults` writes them as non-empty rows on startup. In a fully BYOK deployment where those env vars are absent, the admin user also goes through the key step.
 
 ### 2. `POST /api/settings/validate-keys` (new)
 

@@ -99,6 +99,11 @@ async def test_criteria(req: CriteriaTestRequest, session: Session, current_user
         return {"error": str(exc)}
 
 
+def _sanitize_error(exc: Exception, api_key: str) -> str:
+    msg = str(exc) or "Could not reach provider"
+    return msg.replace(api_key, "[REDACTED]")[:200]
+
+
 async def _check_groq(api_key: str) -> KeyResult:
     try:
         client = AsyncGroq(api_key=api_key)
@@ -109,7 +114,7 @@ async def _check_groq(api_key: str) -> KeyResult:
         )
         return KeyResult(valid=True)
     except Exception as exc:
-        return KeyResult(valid=False, error=(str(exc) or "Could not reach provider")[:200])
+        return KeyResult(valid=False, error=_sanitize_error(exc, api_key))
 
 
 async def _check_cerebras(api_key: str) -> KeyResult:
@@ -122,7 +127,7 @@ async def _check_cerebras(api_key: str) -> KeyResult:
         )
         return KeyResult(valid=True)
     except Exception as exc:
-        return KeyResult(valid=False, error=(str(exc) or "Could not reach provider")[:200])
+        return KeyResult(valid=False, error=_sanitize_error(exc, api_key))
 
 
 async def _check_gemini(api_key: str) -> KeyResult:
@@ -134,7 +139,7 @@ async def _check_gemini(api_key: str) -> KeyResult:
         )
         return KeyResult(valid=True)
     except Exception as exc:
-        return KeyResult(valid=False, error=(str(exc) or "Could not reach provider")[:200])
+        return KeyResult(valid=False, error=_sanitize_error(exc, api_key))
 
 
 @router.post("/validate-keys")

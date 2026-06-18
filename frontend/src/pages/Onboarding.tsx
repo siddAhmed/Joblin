@@ -113,12 +113,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   });
 
   const saveKeys = useMutation({
-    mutationFn: () => {
+    mutationFn: (vals: { groq: string; cerebras: string; gemini: string }) => {
       const payload: Record<string, string> = {
-        groq_api_key: groq.value,
-        cerebras_api_key: cerebras.value,
+        groq_api_key: vals.groq,
+        cerebras_api_key: vals.cerebras,
       };
-      if (gemini.value) payload.gemini_api_key = gemini.value;
+      if (vals.gemini) payload.gemini_api_key = vals.gemini;
       return settingsApi.update(payload);
     },
     onSuccess: () => setStep(2),
@@ -294,7 +294,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   {validateKeysMutation.isPending ? "Testing..." : "Test keys"}
                 </button>
                 <button
-                  onClick={() => saveKeys.mutate()}
+                  onClick={() => saveKeys.mutate({ groq: groq.value, cerebras: cerebras.value, gemini: gemini.value })}
                   disabled={groq.status !== "valid" || cerebras.status !== "valid" || saveKeys.isPending}
                   className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
                 >
