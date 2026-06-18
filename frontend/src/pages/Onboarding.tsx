@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/api/settings";
+import type { ValidateKeysResponse } from "@/api/settings";
 import { companiesApi } from "@/api/companies";
 import type { DefaultCompany } from "@/api/companies";
 import { runsApi } from "@/api/runs";
 import { TagChips } from "@/components/TagChips";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
+type KeyState = { value: string; status: "idle" | "loading" | "valid" | "error"; error: string | null };
 
 interface Preset {
   name: string;
@@ -45,6 +47,13 @@ function toCriteriaValues(raw: Record<string, unknown>): CriteriaValues {
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>(1);
+
+  // Step 1 state
+  const [groq, setGroq] = useState<KeyState>({ value: "", status: "idle", error: null });
+  const [cerebras, setCerebras] = useState<KeyState>({ value: "", status: "idle", error: null });
+  const [gemini, setGemini] = useState<KeyState>({ value: "", status: "idle", error: null });
+
+  // Step 2+ state
   const [webhookUrl, setWebhookUrl] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [testRunId, setTestRunId] = useState<number | null>(null);
@@ -59,13 +68,13 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const { data: defaultCompanies = [] } = useQuery<DefaultCompany[]>({
     queryKey: ["companies-defaults"],
     queryFn: companiesApi.defaults,
-    enabled: step === 3,
+    enabled: step === 4,
   });
 
   const { data: presets = [], isPending: presetsLoading, isError: presetsError } = useQuery<Preset[]>({
     queryKey: ["presets"],
     queryFn: settingsApi.listPresets,
-    enabled: step === 2,
+    enabled: step === 3,
   });
 
   const filteredCompanies = defaultCompanies.filter((c) =>
@@ -87,14 +96,43 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const deselectAll = () =>
     setDeselected(new Set(defaultCompanies.map((c) => c.name)));
 
+  // Step 1 mutations
+  const validateKeysMutation = useMutation({
+    mutationFn: (keys: { groq_api_key?: string; cerebras_api_key?: string; gemini_api_key?: string }) =>
+      settingsApi.validateKeys(keys),
+    onMutate: (keys) => {
+      if (keys.groq_api_key) setGroq((g) => ({ ...g, status: "loading" }));
+      if (keys.cerebras_api_key) setCerebras((c) => ({ ...c, status: "loading" }));
+      if (keys.gemini_api_key) setGemini((g) => ({ ...g, status: "loading" }));
+    },
+    onSuccess: (data: ValidateKeysResponse) => {
+      if (data.groq) setGroq((g) => ({ ...g, status: data.groq!.valid ? "valid" : "error", error: data.groq!.error }));
+      if (data.cerebras) setCerebras((c) => ({ ...c, status: data.cerebras!.valid ? "valid" : "error", error: data.cerebras!.error }));
+      if (data.gemini) setGemini((g) => ({ ...g, status: data.gemini!.valid ? "valid" : "error", error: data.gemini!.error }));
+    },
+  });
+
+  const saveKeys = useMutation({
+    mutationFn: () => {
+      const payload: Record<string, string> = {
+        groq_api_key: groq.value,
+        cerebras_api_key: cerebras.value,
+      };
+      if (gemini.value) payload.gemini_api_key = gemini.value;
+      return settingsApi.update(payload);
+    },
+    onSuccess: () => setStep(2),
+  });
+
+  // Step 2 mutations
   const saveWebhook = useMutation({
     mutationFn: () => settingsApi.update({ discord_webhook_url: webhookUrl }),
-    onSuccess: () => setStep(2),
+    onSuccess: () => setStep(3),
   });
 
   const saveCriteria = useMutation({
     mutationFn: (c: CriteriaValues) => settingsApi.update({ criteria: c }),
-    onSuccess: () => setStep(3),
+    onSuccess: () => setStep(4),
   });
 
   const importCompanies = useMutation({
@@ -102,7 +140,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       const selected = defaultCompanies.filter((c) => !deselected.has(c.name));
       await companiesApi.bulk(selected);
     },
-    onSuccess: () => setStep(4),
+    onSuccess: () => setStep(5),
   });
 
   const startTestRun = useMutation({
@@ -116,7 +154,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     onComplete();
   };
 
-  const stepLabels = ["Discord", "Criteria", "Companies", "Test run"];
+  const stepLabels = ["API Keys", "Discord", "Criteria", "Companies", "Test run"];
 
   return (
     <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center px-4">
@@ -125,7 +163,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           <h1 className="text-2xl font-bold text-[#e5e5e5]">
             Welcome to Job<span className="text-[#4e9eff]">lin</span>
           </h1>
-          <p className="text-sm text-[#666] mt-1">Let's get you set up in 4 steps.</p>
+          <p className="text-sm text-[#666] mt-1">Let's get you set up in 5 steps.</p>
         </div>
 
         <div className="flex gap-1 mb-6">
@@ -142,7 +180,133 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         <div className="border border-[#2a2a2a] rounded-xl p-6 bg-[#111]">
           {step === 1 && (
             <div>
-              <h2 className="text-sm font-semibold mb-3">Step 1: Discord webhook</h2>
+              <h2 className="text-sm font-semibold mb-2">Step 1: Connect your AI providers</h2>
+              <p className="text-xs text-[#666] mb-4">
+                Joblin uses Groq and Cerebras to filter and summarize job listings. Paste your API keys below.
+              </p>
+
+              {/* Groq card */}
+              <div className="border border-[#2a2a2a] rounded-lg p-4 mb-3 bg-[#0a0a0a]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-[#e5e5e5]">
+                    Groq
+                    <span className="text-[#f87171] text-[10px] ml-2">required</span>
+                  </span>
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#4e9eff] hover:underline"
+                  >
+                    Get your key →
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  value={groq.value}
+                  onChange={(e) => setGroq({ value: e.target.value, status: "idle", error: null })}
+                  placeholder="gsk_..."
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                />
+                {groq.status === "valid" && (
+                  <p className="text-[10px] text-[#34d399] mt-1">Valid</p>
+                )}
+                {groq.status === "error" && (
+                  <p className="text-[10px] text-[#f87171] mt-1">{groq.error}</p>
+                )}
+              </div>
+
+              {/* Cerebras card */}
+              <div className="border border-[#2a2a2a] rounded-lg p-4 mb-3 bg-[#0a0a0a]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-[#e5e5e5]">
+                    Cerebras
+                    <span className="text-[#f87171] text-[10px] ml-2">required</span>
+                  </span>
+                  <a
+                    href="https://cloud.cerebras.ai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="API Keys in the sidebar"
+                    className="text-[10px] text-[#4e9eff] hover:underline"
+                  >
+                    Get your key →
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  value={cerebras.value}
+                  onChange={(e) => setCerebras({ value: e.target.value, status: "idle", error: null })}
+                  placeholder="csk_..."
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                />
+                {cerebras.status === "valid" && (
+                  <p className="text-[10px] text-[#34d399] mt-1">Valid</p>
+                )}
+                {cerebras.status === "error" && (
+                  <p className="text-[10px] text-[#f87171] mt-1">{cerebras.error}</p>
+                )}
+              </div>
+
+              {/* Gemini card */}
+              <div className="border border-[#2a2a2a] rounded-lg p-4 mb-4 bg-[#0a0a0a]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-[#e5e5e5]">
+                    Gemini
+                    <span className="text-[#555] text-[10px] ml-2">optional</span>
+                  </span>
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#4e9eff] hover:underline"
+                  >
+                    Get your key →
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  value={gemini.value}
+                  onChange={(e) => setGemini({ value: e.target.value, status: "idle", error: null })}
+                  placeholder="AIza..."
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-xs text-[#e5e5e5]"
+                />
+                {gemini.status === "valid" && (
+                  <p className="text-[10px] text-[#34d399] mt-1">Valid</p>
+                )}
+                {gemini.status === "error" && (
+                  <p className="text-[10px] text-[#f87171] mt-1">{gemini.error}</p>
+                )}
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => {
+                    const keys: { groq_api_key?: string; cerebras_api_key?: string; gemini_api_key?: string } = {};
+                    if (groq.value) keys.groq_api_key = groq.value;
+                    if (cerebras.value) keys.cerebras_api_key = cerebras.value;
+                    if (gemini.value) keys.gemini_api_key = gemini.value;
+                    validateKeysMutation.mutate(keys);
+                  }}
+                  disabled={validateKeysMutation.isPending || (!groq.value && !cerebras.value && !gemini.value)}
+                  className="text-xs border border-[#2a2a2a] rounded px-4 py-2 text-[#888] bg-[#0a0a0a] disabled:opacity-40"
+                >
+                  {validateKeysMutation.isPending ? "Testing..." : "Test keys"}
+                </button>
+                <button
+                  onClick={() => saveKeys.mutate()}
+                  disabled={groq.status !== "valid" || cerebras.status !== "valid" || saveKeys.isPending}
+                  className="text-xs border border-[#4e9eff] rounded px-4 py-2 text-[#4e9eff] bg-[#0e2040] disabled:opacity-40"
+                >
+                  {saveKeys.isPending ? "Saving..." : "Next"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h2 className="text-sm font-semibold mb-3">Step 2: Discord webhook</h2>
               <p className="text-xs text-[#666] mb-3">
                 Create a webhook in your Discord server settings and paste the URL below.
                 Joblin will notify you when strong matches are found.
@@ -161,19 +325,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 >
                   {saveWebhook.isPending ? "Saving..." : "Save and continue"}
                 </button>
-                <button onClick={() => setStep(2)} className="text-xs text-[#555] hover:text-[#888]">
+                <button onClick={() => setStep(3)} className="text-xs text-[#555] hover:text-[#888]">
                   Skip for now
                 </button>
               </div>
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div>
-              <h2 className="text-sm font-semibold mb-3">Step 2: Choose a job criteria preset</h2>
+              <h2 className="text-sm font-semibold mb-3">Step 3: Choose a job criteria preset</h2>
 
               {editorOpen && criteria ? (
-                /* ── Sub-step C: Criteria editor ── */
+                /* Sub-step C: Criteria editor */
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <button
@@ -187,7 +351,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     </span>
                   </div>
 
-                  {/* Importance banner */}
                   <div className="bg-[#0e2040] border border-[#1e3a5f] rounded-lg p-3 mb-4">
                     <div className="text-xs text-[#90c4ff] font-semibold mb-2">⚡ How Joblin filters jobs — two layers</div>
                     <div className="space-y-2">
@@ -202,7 +365,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     </div>
                   </div>
 
-                  {/* Title must match */}
                   <div className="mb-3">
                     <div className="flex items-baseline gap-2 mb-1">
                       <label className="text-[10px] text-[#888] uppercase tracking-wider">Title must match</label>
@@ -216,7 +378,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Regex patterns, pipe-separated. Jobs whose title doesn't match any of these are discarded before AI scoring. Keep patterns broad — <span className="text-[#888]">"react" alone would miss "Frontend Engineer at Stripe"</span>.</p>
                   </div>
 
-                  {/* Title must NOT match */}
                   <div className="mb-3">
                     <div className="flex items-baseline gap-2 mb-1">
                       <label className="text-[10px] text-[#888] uppercase tracking-wider">Title must NOT match</label>
@@ -230,7 +391,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Jobs whose title matches any of these are discarded. Be precise — <span className="text-[#888]">"design" would also block "design systems engineer"</span>.</p>
                   </div>
 
-                  {/* Seniority levels */}
                   <div className="mb-3">
                     <div className="flex items-baseline gap-2 mb-2">
                       <label className="text-[10px] text-[#888] uppercase tracking-wider">Seniority levels</label>
@@ -245,12 +405,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     <p className="text-[9px] text-[#555] mt-1 leading-relaxed">Inferred from the job title. <span className="text-[#888]">If seniority can't be inferred, the job passes through.</span> Leave all unchecked to skip this filter entirely.</p>
                   </div>
 
-                  {/* Your profile */}
                   <div className="mb-3">
                     <div className="flex items-baseline gap-2 mb-1">
                       <label className="text-[10px] text-[#888] uppercase tracking-wider">Your profile</label>
                       <span className="text-[9px] bg-[#0a2010] border border-[#1a4a20] rounded px-1 py-px text-[#34d399]">AI scored</span>
-                      <span className="text-[9px] text-[#34d399]">← most impactful</span>
+                      <span className="text-[9px] text-[#34d399]">most impactful</span>
                     </div>
                     <textarea
                       value={criteria.profile_description}
@@ -261,7 +420,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     <p className="text-[9px] text-[#555] mt-1 leading-relaxed">The AI reads this to score job relevance — it understands context, not just keywords. Include your tech stack, years of experience, what kind of company you want, and what you want to avoid. The more specific, the better your scores.</p>
                   </div>
 
-                  {/* Advanced toggle */}
                   <div className="border-t border-[#1a1a1a] pt-2 mb-2">
                     <button
                       type="button"
@@ -315,7 +473,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex gap-2 items-center">
                     <button
                       onClick={() => saveCriteria.mutate(criteria)}
@@ -325,7 +482,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       {saveCriteria.isPending ? "Saving..." : "Apply and continue"}
                     </button>
                     <button
-                      onClick={() => setStep(3)}
+                      onClick={() => setStep(4)}
                       className="text-xs text-[#555] hover:text-[#888]"
                     >
                       Skip customisation
@@ -334,7 +491,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 </div>
 
               ) : stage === null ? (
-                /* ── Sub-step A: Stage picker (unchanged) ── */
+                /* Sub-step A: Stage picker */
                 <>
                   <p className="text-xs text-[#666] mb-3">What stage are you at?</p>
                   <div className="space-y-2 mb-4">
@@ -355,7 +512,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     ))}
                   </div>
                   <button
-                    onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }}
+                    onClick={() => { setStage(null); setSelectedPreset(null); setStep(4); }}
                     className="text-xs text-[#555] hover:text-[#888]"
                   >
                     Skip
@@ -363,7 +520,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 </>
 
               ) : (
-                /* ── Sub-step B: Preset picker ── */
+                /* Sub-step B: Preset picker */
                 <>
                   <div className="flex items-center gap-2 mb-3">
                     <button
@@ -414,7 +571,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       Customize and continue
                     </button>
                     <button
-                      onClick={() => { setStage(null); setSelectedPreset(null); setStep(3); }}
+                      onClick={() => { setStage(null); setSelectedPreset(null); setStep(4); }}
                       className="text-xs text-[#555] hover:text-[#888]"
                     >
                       Skip
@@ -425,14 +582,13 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div>
-              <h2 className="text-sm font-semibold mb-1">Step 3: Choose companies to track</h2>
+              <h2 className="text-sm font-semibold mb-1">Step 4: Choose companies to track</h2>
               <p className="text-xs text-[#666] mb-3">
                 All companies are pre-selected. Deselect any you don't want.
               </p>
 
-              {/* Controls */}
               <div className="flex items-center gap-2 mb-2">
                 <input
                   value={search}
@@ -449,7 +605,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 </button>
               </div>
 
-              {/* Scrollable company list */}
               <div className="h-64 overflow-y-auto border border-[#1e1e1e] rounded bg-[#0a0a0a] p-2 mb-3">
                 {defaultCompanies.length === 0 ? (
                   <p className="text-[#555] text-xs text-center mt-8">Loading...</p>
@@ -487,16 +642,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     ? "Adding companies..."
                     : `Add ${selectedCount} companies and continue`}
                 </button>
-                <button onClick={() => setStep(4)} className="text-xs text-[#555] hover:text-[#888]">
+                <button onClick={() => setStep(5)} className="text-xs text-[#555] hover:text-[#888]">
                   Skip
                 </button>
               </div>
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div>
-              <h2 className="text-sm font-semibold mb-3">Step 4: Test run</h2>
+              <h2 className="text-sm font-semibold mb-3">Step 5: Test run</h2>
               <p className="text-xs text-[#666] mb-4">
                 Run a preview scrape to see results before enabling the scheduler. No Discord
                 messages will be sent.
