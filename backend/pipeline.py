@@ -2,7 +2,7 @@ import asyncio
 import re
 from datetime import datetime, timezone
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_setting, get_all_settings
@@ -178,8 +178,8 @@ async def _process_phase(
     catalog_company_ids: list[int],
     settings: dict,
     session: AsyncSession,
-) -> tuple[int, int, int, int]:
-    """Per-user heuristic + LLM phase. Returns (new_jobs, passed_heuristic, confirmed, notified)."""
+) -> tuple[int, int, int, int, dict[int, tuple[int, int]]]:
+    """Per-user heuristic + LLM phase. Returns (new_jobs, passed_heuristic, confirmed, notified, company_stats)."""
     from backend.llm.factory import get_filter_provider, get_summarize_provider
     from backend.llm.protocol import CriteriaConfig, FeedbackExample
     from backend.models.match import Match, MatchTier
@@ -210,7 +210,12 @@ async def _process_phase(
         for r in fb_rows
     ]
 
-    # Get raw_jobs for user's companies not yet processed by this user
+    # Get raw_jobs for user's companies not yet processed (or preview-only) by this user
+    if is_preview:
+        freshness_filter = UserJob.id == None
+    else:
+        freshness_filter = or_(UserJob.id == None, UserJob.preview_only == True)
+
     new_raw_jobs = (await session.execute(
         select(RawJob, CompanyCatalog)
         .join(CompanyCatalog, RawJob.catalog_company_id == CompanyCatalog.id)
@@ -221,31 +226,64 @@ async def _process_phase(
         .where(
             RawJob.catalog_company_id.in_(catalog_company_ids),
             RawJob.is_active == True,
-            UserJob.id == None,
+            freshness_filter,
         )
     )).all()
 
     new_count = len(new_raw_jobs)
     passed_count = confirmed_count = notified_count = 0
     now = datetime.now(timezone.utc)
+    company_stats: dict[int, list[int]] = {}  # catalog_company_id -> [passed, confirmed]
 
     for raw_job, catalog_company in new_raw_jobs:
+        # Fix I1: check for cancellation inside the processing loop
+        if run_id in _cancelled_runs:
+            break
+
+        cat_id = catalog_company.id
+        if cat_id not in company_stats:
+            company_stats[cat_id] = [0, 0]
+
         passed = passes_heuristic(raw_job, criteria.__dict__)
 
-        user_job = UserJob(
-            user_id=user_id,
-            raw_job_id=raw_job.id,
-            run_id=run_id,
-            passed_heuristic=passed,
-            preview_only=is_preview,
-        )
-        session.add(user_job)
-        await session.flush()
+        # Fix C1: promote preview-only UserJob rows on real runs instead of creating duplicates
+        existing_uj = (await session.execute(
+            select(UserJob).where(UserJob.raw_job_id == raw_job.id, UserJob.user_id == user_id)
+        )).scalar_one_or_none()
+
+        if existing_uj:
+            # Preview-indexed job being promoted by a real run
+            existing_uj.preview_only = False
+            existing_uj.run_id = run_id
+            user_job = existing_uj
+            await session.flush()
+        else:
+            user_job = UserJob(
+                user_id=user_id,
+                raw_job_id=raw_job.id,
+                run_id=run_id,
+                passed_heuristic=passed,
+                preview_only=is_preview,
+            )
+            session.add(user_job)
+            await session.flush()
 
         if not passed:
             continue
 
         passed_count += 1
+        company_stats[cat_id][0] += 1
+
+        # Fix C1: if promoting a preview job that already has a confirmed match, just flip is_preview
+        existing_match = (await session.execute(
+            select(Match).where(Match.job_id == user_job.id)
+        )).scalar_one_or_none()
+
+        if existing_match and existing_match.is_preview and not is_preview:
+            existing_match.is_preview = False
+            confirmed_count += 1
+            company_stats[cat_id][1] += 1
+            continue
 
         try:
             filter_result = await filter_provider.filter(
@@ -288,10 +326,6 @@ async def _process_phase(
                 total_tokens=summarize_provider.last_usage["total_tokens"],
             ))
 
-        existing_match = (await session.execute(
-            select(Match).where(Match.job_id == user_job.id)
-        )).scalar_one_or_none()
-
         if existing_match:
             if existing_match.is_preview:
                 existing_match.is_preview = False
@@ -310,6 +344,7 @@ async def _process_phase(
             await session.flush()
 
         confirmed_count += 1
+        company_stats[cat_id][1] += 1
 
         if not is_preview and not is_seeding_run and settings.get("discord_webhook_url"):
             try:
@@ -331,10 +366,11 @@ async def _process_phase(
                 pass
 
     await session.commit()
-    return new_count, passed_count, confirmed_count, notified_count
+    company_stats_tuples: dict[int, tuple[int, int]] = {k: (v[0], v[1]) for k, v in company_stats.items()}
+    return new_count, passed_count, confirmed_count, notified_count, company_stats_tuples
 
 
-async def execute_run(run_id: int, session: AsyncSession) -> None:
+async def execute_run(run_id: int, session: AsyncSession, is_manual: bool = True) -> None:
     run = await session.get(Run, run_id)
     if not run:
         return
@@ -343,7 +379,6 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     settings = await get_all_settings(session, user_id=user_id)
     quarantine_threshold = int(settings.get("quarantine_threshold") or 3)
     is_preview = run.is_preview
-    is_manual = not run.is_preview  # preview runs are always treated as manual (always scrape)
 
     # Admin-configurable cache window; read from admin (user_id=1) settings
     try:
@@ -402,7 +437,7 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
     total_found = sum(scrape_counts.values())
 
     # Phase 2: per-user process
-    new_jobs, passed_heuristic, confirmed, notified = await _process_phase(
+    new_jobs, passed_heuristic, confirmed, notified, company_stats = await _process_phase(
         run_id=run_id,
         user_id=user_id,
         is_preview=is_preview,
@@ -412,7 +447,17 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
         session=session,
     )
 
-    # Update run_company_results
+    # Fix I1: check for cancellation after the processing phase
+    if run_id in _cancelled_runs:
+        _cancelled_runs.discard(run_id)
+        run.status = RunStatus.cancelled
+        run.completed_at = datetime.now(timezone.utc)
+        await session.commit()
+        await _emit(run_id, "run_done", {"run_id": run_id, "status": "cancelled", "total_confirmed": confirmed})
+        _run_queues.pop(run_id, None)
+        return
+
+    # Update run_company_results -- Fix C2: populate passed_heuristic and confirmed per company
     for cat in catalog_companies:
         if cat.id in failed:
             row_status = CompanyResultStatus.failed
@@ -420,11 +465,14 @@ async def execute_run(run_id: int, session: AsyncSession) -> None:
         else:
             row_status = CompanyResultStatus.done
             row_error = None
+        cat_passed, cat_confirmed = company_stats.get(cat.id, (0, 0))
         result_row = RunCompanyResult(
             run_id=run_id,
             company_id=cat.id,
             status=row_status,
             jobs_found=scrape_counts.get(cat.id, 0),
+            passed_heuristic=cat_passed,
+            confirmed=cat_confirmed,
             error_message=row_error,
         )
         session.add(result_row)

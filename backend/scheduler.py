@@ -33,7 +33,7 @@ async def _run_scrape_job(user_id: int) -> None:
         await session.refresh(run)
 
     async with AsyncSessionLocal() as session:
-        await execute_run(run.id, session)
+        await execute_run(run.id, session, is_manual=False)
 
 
 async def _schedule_user_job(scheduler: AsyncScheduler, user_id: int) -> None:
