@@ -1,6 +1,5 @@
 import re
-
-from backend.scrapers.base import ScrapedJob
+from typing import Any
 
 SENIORITY_PATTERNS = {
     "junior": r"\bjunior\b|\bjr\.?\b|\bentry.level\b",
@@ -21,7 +20,7 @@ def _infer_seniority(title: str) -> str | None:
     return None
 
 
-def passes_heuristic(job: ScrapedJob, criteria: dict) -> bool:
+def passes_heuristic(job: Any, criteria: dict) -> bool:
     title_lower = job.title.lower()
 
     if criteria.get("title_allowlist"):
