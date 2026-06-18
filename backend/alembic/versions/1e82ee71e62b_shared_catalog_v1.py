@@ -181,7 +181,7 @@ def upgrade() -> None:
         else:
             # Keep the earliest first_seen_at
             conn.execute(text("""
-                UPDATE raw_jobs SET first_seen_at = MIN(first_seen_at, :fsa) WHERE id = :id
+                UPDATE raw_jobs SET first_seen_at = :fsa WHERE id = :id AND first_seen_at > :fsa
             """), {"fsa": job.first_seen_at, "id": raw_job_key_to_id[key]})
 
     # Insert user_jobs; map old job.id -> user_job.id for FK updates
@@ -257,8 +257,8 @@ def upgrade() -> None:
                         new_ids.append(uc_id)
             conn.execute(text("UPDATE runs SET company_ids = :ids WHERE id = :id"),
                          {"ids": json.dumps(new_ids), "id": row.id})
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: skipping run {row.id} company_ids remap: {e}")
 
 
 def downgrade() -> None:
