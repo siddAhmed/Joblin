@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { companiesApi } from "@/api/companies";
-import type { Company, ProbeResult } from "@/api/companies";
+import { companiesApi, matchStatusMessage } from "@/api/companies";
+import type { Company, ProbeResult, AddCompanyResponse } from "@/api/companies";
 
 function AddModal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<"url" | "name">("url");
@@ -10,13 +10,17 @@ function AddModal({ onClose }: { onClose: () => void }) {
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const add = useMutation({
     mutationFn: () => companiesApi.add(name, url),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["companies"] });
-      onClose();
+    onSuccess: (result: AddCompanyResponse) => {
+      setStatusMsg(matchStatusMessage(result.match_status));
+      if (result.match_status !== "already_in_your_list") {
+        qc.invalidateQueries({ queryKey: ["companies"] });
+        onClose();
+      }
     },
   });
 
@@ -92,6 +96,11 @@ function AddModal({ onClose }: { onClose: () => void }) {
                     {a.url} -- {a.status_code ?? a.error}
                   </div>
                 ))}
+              </div>
+            )}
+            {statusMsg && (
+              <div className="mb-3 text-xs rounded px-2 py-1.5 bg-[#0e1a1a] border border-[#1e3a3a] text-[#4ecfcf]">
+                {statusMsg}
               </div>
             )}
             <div className="flex gap-2">

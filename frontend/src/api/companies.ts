@@ -11,6 +11,36 @@ export interface Company {
   quarantine_reason: string | null;
   discovery_status: "none" | "discovering" | "failed";
   discovery_message: string | null;
+  catalog_id: number | null;
+  source: string | null;
+}
+
+export interface AddCompanyResponse {
+  id: number;
+  catalog_id: number;
+  ats_type: string;
+  probe_attempts: Array<{ url: string; status_code: number | null; error: string | null }>;
+  match_status:
+    | "added_new"
+    | "linked_existing_working"
+    | "linked_existing_pending"
+    | "linked_existing_quarantined"
+    | "already_in_your_list";
+}
+
+export function matchStatusMessage(status: AddCompanyResponse["match_status"]): string {
+  switch (status) {
+    case "added_new":
+      return "Added -- detecting ATS type...";
+    case "linked_existing_working":
+      return "Already in our catalog and working -- added to your list";
+    case "linked_existing_pending":
+      return "Already in our catalog (ATS detection pending) -- added to your list";
+    case "linked_existing_quarantined":
+      return "This company is in our catalog but currently quarantined -- added anyway";
+    case "already_in_your_list":
+      return "You are already monitoring this company";
+  }
 }
 
 export interface ProbeResult {
@@ -30,7 +60,7 @@ export const companiesApi = {
   probe: (name: string, careers_url: string) =>
     api.post<ProbeResult>("/companies/probe", { name, careers_url }).then((r) => r.data),
   add: (name: string, careers_url: string) =>
-    api.post("/companies", { name, careers_url }).then((r) => r.data),
+    api.post<AddCompanyResponse>("/companies", { name, careers_url }).then((r) => r.data),
   bulk: (items: DefaultCompany[]) =>
     api.post<{ created: number }>("/companies/bulk", items).then((r) => r.data),
   discover: (names: string[]) =>
