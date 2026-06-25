@@ -1,0 +1,5 @@
+- [ ] add the ability to hit enter to press the main button on a modal
+- [x] make the initial addition of companies faster
+- [x] have the current companies as default for each user
+- [x] have an agentic loop to fetch the company portal names just by taking the names from the user
+- [] Llama 4 Scout 17B is getting deprecated, move to another model (Qwen3.6 27B)
