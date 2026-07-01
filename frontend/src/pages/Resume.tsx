@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Editor from "@monaco-editor/react";
-import { resumeApi } from "@/api/resume";
+import { resumeApi, tailorWithProgress } from "@/api/resume";
 import { matchesApi } from "@/api/matches";
 
 interface TailoredFor {
@@ -20,7 +20,8 @@ export function Resume() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<number | "">("");
   const [isCompiling, setIsCompiling] = useState(false);
-  const [isTailoring, setIsTailoring] = useState(false);
+  const [tailorPhase, setTailorPhase] = useState<number>(0);
+  const [tailorPhaseLabel, setTailorPhaseLabel] = useState<string>("");
   const [compileError, setCompileError] = useState<string | null>(null);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -95,11 +96,18 @@ export function Resume() {
 
   async function handleTailor() {
     if (!selectedJobId) return;
-    setIsTailoring(true);
+    setTailorPhase(1);
+    setTailorPhaseLabel("Analyzing job requirements...");
     setTailorError(null);
     try {
-      const result = await resumeApi.tailor(Number(selectedJobId));
-      setEditorContent(result.tex_content);
+      const texContent = await tailorWithProgress(
+        Number(selectedJobId),
+        (phase, label) => {
+          setTailorPhase(phase);
+          setTailorPhaseLabel(label);
+        }
+      );
+      setEditorContent(texContent);
       const match = matches.find((m) => m.job_id === Number(selectedJobId));
       setTailoredFor({
         jobId: Number(selectedJobId),
@@ -107,9 +115,10 @@ export function Resume() {
         company: match?.company_name ?? "Unknown",
       });
     } catch (err: any) {
-      setTailorError(err?.response?.data?.detail || "Tailoring failed");
+      setTailorError(err?.message || "Tailoring failed");
     } finally {
-      setIsTailoring(false);
+      setTailorPhase(0);
+      setTailorPhaseLabel("");
     }
   }
 
@@ -250,10 +259,10 @@ export function Resume() {
         </select>
         <button
           onClick={handleTailor}
-          disabled={!selectedJobId || !hasReference || isTailoring}
+          disabled={!selectedJobId || !hasReference || tailorPhase > 0}
           className="text-xs border border-[#4e4e9f] rounded px-3 py-1 text-[#a78bfa] hover:bg-[#1a1a3a] disabled:opacity-40"
         >
-          {isTailoring ? "Tailoring..." : "✦ Tailor"}
+          {tailorPhase > 0 ? "Tailoring..." : "✦ Tailor"}
         </button>
         <button
           onClick={handleCompile}
@@ -328,6 +337,44 @@ export function Resume() {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Tailor progress */}
+      {tailorPhase > 0 && (
+        <div className="px-4 py-2 border-b border-[#1e1e1e] bg-[#0a0a0a] shrink-0">
+          <div className="flex flex-col gap-1">
+            {[
+              { n: 1, label: "Analyzing job requirements..." },
+              { n: 2, label: "Selecting relevant experiences..." },
+              { n: 3, label: "Tailoring resume..." },
+            ].map(({ n, label }) => (
+              <div key={n} className="flex items-center gap-2 text-[11px]">
+                <span
+                  className={
+                    tailorPhase > n
+                      ? "text-[#4ade80]"
+                      : tailorPhase === n
+                      ? "text-[#a78bfa]"
+                      : "text-[#333]"
+                  }
+                >
+                  {tailorPhase > n ? "✓" : tailorPhase === n ? "◌" : "○"}
+                </span>
+                <span
+                  className={
+                    tailorPhase > n
+                      ? "text-[#555]"
+                      : tailorPhase === n
+                      ? "text-[#a78bfa]"
+                      : "text-[#333]"
+                  }
+                >
+                  {tailorPhase === n ? tailorPhaseLabel || label : label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
