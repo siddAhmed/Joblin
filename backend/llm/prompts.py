@@ -1,3 +1,4 @@
+import json
 from backend.llm.protocol import CriteriaConfig, FeedbackExample
 
 
@@ -80,9 +81,48 @@ def build_skills_prompt(title: str, description: str) -> str:
     )
 
 
-def build_tailor_prompt(tex_content: str, job_description: str) -> tuple[str, str]:
+def build_job_analysis_prompt(job_description: str) -> tuple[str, str]:
     system = (
-        "You are a resume tailoring expert. Given a LaTeX resume and a job description, "
+        "You are a job requirements analyst. Extract the key requirements from a job description. "
+        "Return JSON only, no other text: "
+        '{"required_skills": [...], "preferred_skills": [...], "key_themes": [...], '
+        '"seniority_signals": [...], "keywords": [...]}'
+    )
+    user = f"Job description:\n\n{job_description[:3000]}"
+    return system, user
+
+
+def build_activity_selection_prompt(
+    requirements: dict,
+    tex_content: str,
+    activities_content: str | None,
+) -> tuple[str, str]:
+    system = (
+        "You are a career coach selecting content for a resume tailoring task. "
+        "Given job requirements, a reference resume, and optionally an activities bank, "
+        "select the 6-8 most relevant items to emphasize in the final resume. "
+        "Return a plain-text numbered list. Be selective - only items that genuinely strengthen this application. "
+        "Do not reproduce LaTeX syntax. For items from the resume, quote or paraphrase the key phrase. "
+        "For items from the activities bank, copy the relevant text verbatim."
+    )
+    req_text = json.dumps(requirements, indent=2)
+    activities_section = (
+        f"\n\nActivities bank:\n{activities_content}" if activities_content else ""
+    )
+    user = (
+        f"Job requirements:\n{req_text}\n\n"
+        f"Reference resume (LaTeX):\n{tex_content}"
+        f"{activities_section}\n\n"
+        "Select the 6-8 most relevant items from the resume"
+        + (" and activities bank" if activities_content else "")
+        + " for this role."
+    )
+    return system, user
+
+
+def build_tailor_prompt(tex_content: str, selected_items: str) -> tuple[str, str]:
+    system = (
+        "You are a resume tailoring expert. Given a LaTeX resume and a curated list of items to emphasize, "
         "return ONLY the modified LaTeX source code. No explanation, no markdown code fences, "
         "no commentary of any kind - just the raw .tex content. "
         "Critical LaTeX rules: always escape special characters in text -- use \\& not &, "
@@ -91,9 +131,9 @@ def build_tailor_prompt(tex_content: str, job_description: str) -> tuple[str, st
     )
     user = (
         f"Here is my LaTeX resume:\n\n{tex_content}\n\n"
-        f"Here is the job description:\n\n{job_description[:3000]}\n\n"
-        "Please modify the resume to emphasize skills and experience most relevant to this role. "
-        "Adjust bullet points to highlight matching technologies, and reorder content if beneficial. "
+        f"Items to emphasize in this tailored version:\n\n{selected_items}\n\n"
+        "Please modify the resume to incorporate and highlight these items. "
+        "Adjust bullet points, reorder sections if beneficial, and ensure the selected items are prominent. "
         "Preserve the original LaTeX template structure and commands exactly."
     )
     return system, user

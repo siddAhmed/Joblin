@@ -66,3 +66,45 @@ async def test_groq_adapter_handles_json_parse_error():
 
     result = await adapter.filter("Title", "Co", None, "desc", CriteriaConfig(), [])
     assert result.score == 0.0
+
+
+from backend.llm.prompts import (
+    build_job_analysis_prompt,
+    build_activity_selection_prompt,
+    build_tailor_prompt,
+)
+
+
+def test_build_job_analysis_prompt_contains_job_description():
+    system, user = build_job_analysis_prompt("We need a Python engineer with FastAPI experience.")
+    assert "Python engineer" in user
+    assert "required_skills" in system
+    assert "JSON" in system
+
+
+def test_build_activity_selection_prompt_includes_all_sources():
+    requirements = {"required_skills": ["Python"], "preferred_skills": [], "key_themes": ["backend"], "seniority_signals": [], "keywords": []}
+    tex = r"\documentclass{article}\begin{document}5 years Python\end{document}"
+    activities = "## Side Projects\n- Built a CLI tool in Rust"
+    system, user = build_activity_selection_prompt(requirements, tex, activities)
+    assert "Python" in user
+    assert "5 years Python" in user
+    assert "CLI tool in Rust" in user
+    assert "6-8" in system
+
+
+def test_build_activity_selection_prompt_handles_none_activities():
+    requirements = {"required_skills": ["Go"], "preferred_skills": [], "key_themes": [], "seniority_signals": [], "keywords": []}
+    tex = r"\documentclass{article}\begin{document}Go developer\end{document}"
+    system, user = build_activity_selection_prompt(requirements, tex, None)
+    assert "Go developer" in user
+    assert "Activities bank" not in user
+
+
+def test_build_tailor_prompt_uses_selected_items():
+    tex = r"\documentclass{article}\begin{document}Resume\end{document}"
+    selected = "1. Python experience\n2. REST API design"
+    system, user = build_tailor_prompt(tex, selected)
+    assert "Python experience" in user
+    assert "REST API design" in user
+    assert "job description" not in user.lower()
