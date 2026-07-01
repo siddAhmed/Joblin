@@ -2,7 +2,14 @@ import json
 from groq import AsyncGroq
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt, build_tailor_prompt
+from backend.llm.prompts import (
+    build_filter_prompt,
+    build_summarize_prompt,
+    build_skills_prompt,
+    build_job_analysis_prompt,
+    build_activity_selection_prompt,
+    build_tailor_prompt,
+)
 
 
 class GroqAdapter:
@@ -80,8 +87,41 @@ class GroqAdapter:
         except Exception:
             return []
 
-    async def tailor_resume(self, tex_content: str, job_description: str) -> str:
-        system, user = build_tailor_prompt(tex_content, job_description)
+    async def analyze_job(self, job_description: str) -> dict:
+        system, user = build_job_analysis_prompt(job_description)
+        response = await self._client.chat.completions.create(
+            model=self._summarize_model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            temperature=0.0,
+            max_tokens=512,
+        )
+        self._record_usage(response.usage)
+        raw = response.choices[0].message.content or ""
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
+            return json.loads(raw[start:end])
+        except Exception:
+            return {"required_skills": [], "preferred_skills": [], "key_themes": [], "seniority_signals": [], "keywords": []}
+
+    async def select_activities(
+        self,
+        requirements: dict,
+        tex_content: str,
+        activities_content: str | None,
+    ) -> str:
+        system, user = build_activity_selection_prompt(requirements, tex_content, activities_content)
+        response = await self._client.chat.completions.create(
+            model=self._summarize_model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            temperature=0.3,
+            max_tokens=1024,
+        )
+        self._record_usage(response.usage)
+        return response.choices[0].message.content or ""
+
+    async def tailor_resume(self, tex_content: str, selected_items: str) -> str:
+        system, user = build_tailor_prompt(tex_content, selected_items)
         response = await self._client.chat.completions.create(
             model=self._summarize_model,
             messages=[

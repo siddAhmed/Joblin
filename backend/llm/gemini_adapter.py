@@ -2,7 +2,14 @@ import json
 from google import genai
 
 from backend.llm.protocol import CriteriaConfig, FeedbackExample, FilterResult
-from backend.llm.prompts import build_filter_prompt, build_summarize_prompt, build_skills_prompt, build_tailor_prompt
+from backend.llm.prompts import (
+    build_filter_prompt,
+    build_summarize_prompt,
+    build_skills_prompt,
+    build_job_analysis_prompt,
+    build_activity_selection_prompt,
+    build_tailor_prompt,
+)
 
 
 class GeminiAdapter:
@@ -80,8 +87,39 @@ class GeminiAdapter:
         except Exception:
             return []
 
-    async def tailor_resume(self, tex_content: str, job_description: str) -> str:
-        system, user = build_tailor_prompt(tex_content, job_description)
+    async def analyze_job(self, job_description: str) -> dict:
+        system, user = build_job_analysis_prompt(job_description)
+        prompt = f"{system}\n\n{user}"
+        response = await self._client.aio.models.generate_content(
+            model=self._summarize_model,
+            contents=prompt,
+        )
+        self._record_usage(response)
+        raw = response.text or ""
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
+            return json.loads(raw[start:end])
+        except Exception:
+            return {"required_skills": [], "preferred_skills": [], "key_themes": [], "seniority_signals": [], "keywords": []}
+
+    async def select_activities(
+        self,
+        requirements: dict,
+        tex_content: str,
+        activities_content: str | None,
+    ) -> str:
+        system, user = build_activity_selection_prompt(requirements, tex_content, activities_content)
+        prompt = f"{system}\n\n{user}"
+        response = await self._client.aio.models.generate_content(
+            model=self._summarize_model,
+            contents=prompt,
+        )
+        self._record_usage(response)
+        return response.text or ""
+
+    async def tailor_resume(self, tex_content: str, selected_items: str) -> str:
+        system, user = build_tailor_prompt(tex_content, selected_items)
         prompt = f"{system}\n\n{user}"
         response = await self._client.aio.models.generate_content(
             model=self._summarize_model,
