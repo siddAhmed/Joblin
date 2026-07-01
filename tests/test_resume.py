@@ -9,6 +9,13 @@ from backend.models.raw_job import RawJob
 from backend.models.user_job import UserJob
 
 
+async def test_activities_column_exists(client):
+    # activities_content should be null before any PUT
+    response = await client.get("/api/resume/activities")
+    assert response.status_code == 200
+    assert response.json()["activities_content"] is None
+
+
 async def test_get_resume_returns_404_when_none(client):
     response = await client.get("/api/resume")
     assert response.status_code == 404
