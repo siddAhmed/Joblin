@@ -13,6 +13,7 @@ import { Onboarding } from "./pages/Onboarding";
 import { Usage } from "./pages/Usage";
 import { Insights } from "./pages/Insights";
 import { Resume } from "./pages/Resume";
+import { Activities } from "./pages/Activities";
 import { Applications } from "./pages/Applications";
 
 function AppInner() {
@@ -37,6 +38,7 @@ function AppInner() {
         <Route path="/usage" element={<Usage />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/resume" element={<Resume />} />
+        <Route path="/activities" element={<Activities />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

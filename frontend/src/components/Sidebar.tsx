@@ -12,6 +12,7 @@ const NAV = [
   { label: "Usage", icon: "◈", path: "/usage" },
   { label: "Insights", icon: "◎", path: "/insights" },
   { label: "Resume", icon: "⊡", path: "/resume" },
+  { label: "Activities", icon: "⊟", path: "/activities" },
   { label: "Settings", icon: "⚙", path: "/settings" },
 ] as const;
 
