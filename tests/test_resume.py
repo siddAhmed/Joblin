@@ -139,3 +139,37 @@ async def test_tailor_resume_success(client, seeded_job_id):
         tex_content=tex,
         job_description="Python, distributed systems, REST APIs, PostgreSQL",
     )
+
+
+async def test_get_activities_returns_null_when_no_resume(client):
+    response = await client.get("/api/resume/activities")
+    assert response.status_code == 200
+    assert response.json()["activities_content"] is None
+    assert response.json()["updated_at"] is None
+
+
+async def test_save_activities_then_get(client):
+    content = "# Work Experience\n- Built a thing\n"
+    put = await client.put("/api/resume/activities", json={"activities_content": content})
+    assert put.status_code == 200
+    assert put.json()["activities_content"] == content
+    assert "updated_at" in put.json()
+
+    get = await client.get("/api/resume/activities")
+    assert get.status_code == 200
+    assert get.json()["activities_content"] == content
+
+
+async def test_save_activities_twice_overwrites(client):
+    await client.put("/api/resume/activities", json={"activities_content": "v1"})
+    await client.put("/api/resume/activities", json={"activities_content": "v2"})
+    get = await client.get("/api/resume/activities")
+    assert get.json()["activities_content"] == "v2"
+
+
+async def test_save_activities_does_not_change_tex_content(client):
+    tex = r"\documentclass{article}\begin{document}My resume\end{document}"
+    await client.put("/api/resume", json={"tex_content": tex})
+    await client.put("/api/resume/activities", json={"activities_content": "# Activities"})
+    get = await client.get("/api/resume")
+    assert get.json()["tex_content"] == tex

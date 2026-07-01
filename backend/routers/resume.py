@@ -26,6 +26,47 @@ class ResumeSave(BaseModel):
     tex_content: str
 
 
+class ActivitiesSave(BaseModel):
+    activities_content: str
+
+
+@router.get("/activities")
+async def get_activities(session: Session, current_user: CurrentUser):
+    resume = (await session.execute(
+        select(Resume).where(Resume.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if resume is None:
+        return {"activities_content": None, "updated_at": None}
+    return {
+        "activities_content": resume.activities_content,
+        "updated_at": resume.updated_at.isoformat() if resume.updated_at else None,
+    }
+
+
+@router.put("/activities")
+async def save_activities(body: ActivitiesSave, session: Session, current_user: CurrentUser):
+    resume = (await session.execute(
+        select(Resume).where(Resume.user_id == current_user.id)
+    )).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if resume is None:
+        resume = Resume(
+            user_id=current_user.id,
+            tex_content="",
+            activities_content=body.activities_content,
+            updated_at=now,
+        )
+        session.add(resume)
+    else:
+        resume.activities_content = body.activities_content
+        resume.updated_at = now
+    await session.commit()
+    return {
+        "activities_content": resume.activities_content,
+        "updated_at": resume.updated_at.isoformat(),
+    }
+
+
 @router.get("")
 async def get_resume(session: Session, current_user: CurrentUser):
     resume = (await session.execute(
