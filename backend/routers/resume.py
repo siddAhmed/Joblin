@@ -86,7 +86,6 @@ async def save_activities(body: ActivitiesSave, session: Session, current_user: 
         session.add(resume)
     else:
         resume.activities_content = body.activities_content
-        resume.updated_at = now
     await session.commit()
     return {
         "activities_content": resume.activities_content,
