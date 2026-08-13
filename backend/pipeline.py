@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 from datetime import datetime, timezone
 
@@ -298,7 +299,11 @@ async def _process_phase(
                 criteria=criteria,
                 negative_examples=negative_examples,
             )
-        except Exception:
+        except Exception as llm_exc:
+            logging.warning(
+                "LLM filter failed for job %s (%s): %s: %s",
+                raw_job.title, catalog_company.name, type(llm_exc).__name__, llm_exc
+            )
             filter_result = None
 
         if hasattr(filter_provider, "last_usage") and filter_provider.last_usage.get("total_tokens", 0) > 0:
@@ -321,7 +326,11 @@ async def _process_phase(
                 title=raw_job.title, company_name=catalog_company.name,
                 description=raw_job.raw_description, score=filter_result.score,
             )
-        except Exception:
+        except Exception as llm_exc:
+            logging.warning(
+                "LLM summarize failed for job %s (%s): %s: %s",
+                raw_job.title, catalog_company.name, type(llm_exc).__name__, llm_exc
+            )
             summary = ""
 
         if hasattr(summarize_provider, "last_usage") and summarize_provider.last_usage.get("total_tokens", 0) > 0:

@@ -24,19 +24,19 @@ def passes_heuristic(job: Any, criteria: dict) -> bool:
     title_lower = job.title.lower()
 
     if criteria.get("title_allowlist"):
-        if not re.search(criteria["title_allowlist"], title_lower):
+        if not re.search(criteria["title_allowlist"], title_lower, re.IGNORECASE):
             return False
 
     if criteria.get("title_denylist"):
-        if re.search(criteria["title_denylist"], title_lower):
+        if re.search(criteria["title_denylist"], title_lower, re.IGNORECASE):
             return False
 
     loc = (job.location or "").lower()
     if criteria.get("location_allowlist") and loc:
-        if not re.search(criteria["location_allowlist"], loc):
+        if not re.search(criteria["location_allowlist"], loc, re.IGNORECASE):
             return False
     if criteria.get("location_denylist") and loc:
-        if re.search(criteria["location_denylist"], loc):
+        if re.search(criteria["location_denylist"], loc, re.IGNORECASE):
             return False
 
     allowed_seniority: list = criteria.get("seniority_allowlist", [])
